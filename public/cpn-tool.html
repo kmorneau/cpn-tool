@@ -623,6 +623,7 @@ input, textarea, select { font-family: var(--mono); color: var(--text); backgrou
     <div class="panel-hdr" style="margin-top:2px">Properties</div>
     <div id="props-scroll">
       <div id="props-inner">
+        <!-- CPN properties (visual/text mode) -->
         <div class="no-sel" id="no-sel">Select a node to edit</div>
         <div id="props-form" style="display:none">
           <div class="prop-row">
@@ -650,6 +651,52 @@ input, textarea, select { font-family: var(--mono); color: var(--text); backgrou
             <label style="font-size:19px;color:var(--text2);display:flex;align-items:center;gap:6px">
               <input type="checkbox" id="snap-chk" checked> Snap to 24px grid
             </label>
+          </div>
+        </div>
+
+        <!-- IDEF0 properties (idef0 mode) -->
+        <div id="idef0-props" style="display:none">
+          <div class="no-sel" id="idef0-no-sel">Select a box or arrow</div>
+          <div id="idef0-box-props" style="display:none">
+            <div class="prop-row">
+              <div class="prop-lbl">Label</div>
+              <input class="prop-inp" id="ip-label" type="text" placeholder="Activity name">
+            </div>
+            <div class="prop-row">
+              <div class="prop-lbl">Description</div>
+              <input class="prop-inp" id="ip-desc" type="text" placeholder="Brief description">
+            </div>
+            <div class="prop-row">
+              <div class="prop-lbl">Size</div>
+              <div style="display:flex;gap:4px">
+                <input class="prop-inp" id="ip-w" type="number" min="80" max="400" style="width:50%" placeholder="W">
+                <input class="prop-inp" id="ip-h" type="number" min="60" max="300" style="width:50%" placeholder="H">
+              </div>
+            </div>
+            <div class="prop-row">
+              <div class="prop-lbl">CPN Sub-model</div>
+              <div style="font-size:13px;color:var(--text3);padding:2px 0" id="ip-cpn-status"></div>
+              <button class="prop-inp" id="ip-drill" style="margin-top:4px;cursor:pointer;background:var(--bg3);color:var(--enabled);border-color:var(--place)">▶ Open CPN</button>
+            </div>
+          </div>
+          <div id="idef0-arrow-props" style="display:none">
+            <div class="prop-row">
+              <div class="prop-lbl">Label</div>
+              <input class="prop-inp" id="ip-arr-label" type="text" placeholder="e.g. Customer Order">
+            </div>
+            <div class="prop-row">
+              <div class="prop-lbl">Role</div>
+              <select class="prop-inp" id="ip-arr-role">
+                <option value="i">Input (I) — left</option>
+                <option value="c">Control (C) — top</option>
+                <option value="o">Output (O) — right</option>
+                <option value="m">Mechanism (M) — bottom</option>
+              </select>
+            </div>
+            <div class="prop-row">
+              <div class="prop-lbl">Color Set</div>
+              <input class="prop-inp" id="ip-arr-cs" type="text" placeholder="e.g. DATA">
+            </div>
           </div>
         </div>
       </div>
@@ -2018,6 +2065,99 @@ document.getElementById('snap-chk').addEventListener('change',ev=>{
   document.getElementById('sb-snap').querySelector('.sb-val').textContent=S.snap?'ON':'OFF';
 });
 
+// ── IDEF0 properties panel ───────────────────────────────────
+function updateIDEF0PropsPanel() {
+  const noSel   = document.getElementById('idef0-no-sel');
+  const boxForm  = document.getElementById('idef0-box-props');
+  const arrForm  = document.getElementById('idef0-arrow-props');
+  const sel = IDEF0.selected;
+
+  if (!sel) {
+    noSel.style.display  = '';
+    boxForm.style.display = 'none';
+    arrForm.style.display = 'none';
+    return;
+  }
+
+  noSel.style.display = 'none';
+
+  if (sel.type === 'box') {
+    const box = idef0FindBox(sel.id);
+    if (!box) return;
+    boxForm.style.display = '';
+    arrForm.style.display = 'none';
+    document.getElementById('ip-label').value = box.label || '';
+    document.getElementById('ip-desc').value  = box.desc  || '';
+    document.getElementById('ip-w').value     = box.w;
+    document.getElementById('ip-h').value     = box.h;
+    const hasCPN = !!(box.cpnData && box.cpnData._initialized);
+    document.getElementById('ip-cpn-status').textContent = hasCPN ? '✓ CPN model saved' : '(none yet)';
+    document.getElementById('ip-cpn-status').style.color = hasCPN ? 'var(--trans-hi)' : 'var(--text3)';
+  } else if (sel.type === 'arrow') {
+    const arrow = idef0FindArrow(sel.id);
+    if (!arrow) return;
+    arrForm.style.display = '';
+    boxForm.style.display = 'none';
+    document.getElementById('ip-arr-label').value = arrow.label   || '';
+    document.getElementById('ip-arr-role').value  = arrow.role    || 'i';
+    document.getElementById('ip-arr-cs').value    = arrow.colorSet || '';
+  }
+}
+
+// Box property changes
+document.getElementById('ip-label').addEventListener('input', ev => {
+  const sel = IDEF0.selected; if (!sel || sel.type !== 'box') return;
+  const box = idef0FindBox(sel.id); if (!box) return;
+  box.label = ev.target.value;
+  scheduleIDEF0Autosave();
+  renderIDEF0();
+});
+document.getElementById('ip-desc').addEventListener('input', ev => {
+  const sel = IDEF0.selected; if (!sel || sel.type !== 'box') return;
+  const box = idef0FindBox(sel.id); if (!box) return;
+  box.desc = ev.target.value;
+  scheduleIDEF0Autosave();
+  renderIDEF0();
+});
+document.getElementById('ip-w').addEventListener('change', ev => {
+  const sel = IDEF0.selected; if (!sel || sel.type !== 'box') return;
+  const box = idef0FindBox(sel.id); if (!box) return;
+  const v = parseInt(ev.target.value); if (isNaN(v) || v < 80) return;
+  box.w = v; scheduleIDEF0Autosave(); renderIDEF0();
+});
+document.getElementById('ip-h').addEventListener('change', ev => {
+  const sel = IDEF0.selected; if (!sel || sel.type !== 'box') return;
+  const box = idef0FindBox(sel.id); if (!box) return;
+  const v = parseInt(ev.target.value); if (isNaN(v) || v < 60) return;
+  box.h = v; scheduleIDEF0Autosave(); renderIDEF0();
+});
+document.getElementById('ip-drill').addEventListener('click', () => {
+  const sel = IDEF0.selected; if (!sel || sel.type !== 'box') return;
+  idef0DrillDown(sel.id);
+});
+
+// Arrow property changes
+document.getElementById('ip-arr-label').addEventListener('input', ev => {
+  const sel = IDEF0.selected; if (!sel || sel.type !== 'arrow') return;
+  const arrow = idef0FindArrow(sel.id); if (!arrow) return;
+  arrow.label = ev.target.value;
+  scheduleIDEF0Autosave();
+  renderIDEF0();
+});
+document.getElementById('ip-arr-role').addEventListener('change', ev => {
+  const sel = IDEF0.selected; if (!sel || sel.type !== 'arrow') return;
+  const arrow = idef0FindArrow(sel.id); if (!arrow) return;
+  arrow.role = ev.target.value;
+  scheduleIDEF0Autosave();
+  renderIDEF0();
+});
+document.getElementById('ip-arr-cs').addEventListener('input', ev => {
+  const sel = IDEF0.selected; if (!sel || sel.type !== 'arrow') return;
+  const arrow = idef0FindArrow(sel.id); if (!arrow) return;
+  arrow.colorSet = ev.target.value;
+  scheduleIDEF0Autosave();
+});
+
 // ═══════════════════════════════════════════════════════════
 // ARC MODAL
 // ═══════════════════════════════════════════════════════════
@@ -2189,6 +2329,11 @@ function switchMode(mode) {
     idef0Tools.classList.add('mode-idef0');
     document.getElementById('cpn-save-bar').style.display  = 'none';
     document.getElementById('idef0-save-bar').style.display = '';
+    // Swap properties panel
+    document.getElementById('no-sel').style.display    = 'none';
+    document.getElementById('props-form').style.display = 'none';
+    document.getElementById('idef0-props').style.display = '';
+    updateIDEF0PropsPanel();
     // Load example on first open if empty
     if (!IDEF0._exampleLoaded && !IDEF0.boxes.length) {
       IDEF0._exampleLoaded = true;
@@ -2204,6 +2349,8 @@ function switchMode(mode) {
     simControls.style.display = '';
     document.getElementById('cpn-save-bar').style.display  = '';
     document.getElementById('idef0-save-bar').style.display = 'none';
+    // Restore CPN properties panel
+    document.getElementById('idef0-props').style.display = 'none';
 
     if (mode === 'text') {
       canvasWrap.style.display = 'none';
@@ -2447,6 +2594,7 @@ function renderIDEF0Boxes() {
         IDEF0.selected = { type: 'box', id: box.id };
         idef0StartDrag(ev, box);
         renderIDEF0();
+        updateIDEF0PropsPanel();
       }
     });
     g.addEventListener('dblclick', ev => {
@@ -2494,6 +2642,7 @@ function renderIDEF0Arrows() {
       if (IDEF0.tool === 'delete') { idef0DeleteArrow(arrow.id); return; }
       IDEF0.selected = { type: 'arrow', id: arrow.id };
       renderIDEF0();
+      updateIDEF0PropsPanel();
     });
     g.appendChild(hit);
 
@@ -2654,6 +2803,7 @@ function openIDEF0BoxModal(box) {
     box.desc  = document.getElementById('m-idef0-box-desc').value.trim();
     cleanup();
     renderIDEF0();
+    updateIDEF0PropsPanel();
   }
   function onCancel() { cleanup(); }
   document.getElementById('m-idef0-box-ok').addEventListener('click', onOk, { once: true });
@@ -2673,6 +2823,7 @@ function idef0DeleteBox(id) {
   if (IDEF0.selected?.id === id) IDEF0.selected = null;
   if (typeof scheduleIDEF0Autosave === 'function') scheduleIDEF0Autosave();
   renderIDEF0();
+  updateIDEF0PropsPanel();
 }
 
 function idef0DeleteArrow(id) {
@@ -2680,6 +2831,7 @@ function idef0DeleteArrow(id) {
   if (IDEF0.selected?.id === id) IDEF0.selected = null;
   if (typeof scheduleIDEF0Autosave === 'function') scheduleIDEF0Autosave();
   renderIDEF0();
+  updateIDEF0PropsPanel();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2724,6 +2876,7 @@ document.getElementById('idef0-svg').addEventListener('click', ev => {
   // Select tool — deselect
   IDEF0.selected = null;
   renderIDEF0();
+  updateIDEF0PropsPanel();
 });
 
 // Arrow preview on mousemove
