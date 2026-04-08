@@ -2460,17 +2460,19 @@ function idef0RefPoint(ref) {
   return { x: 0, y: 0 };
 }
 
-// Build an orthogonal (elbow) path between two points with source/target sides
-function idef0ElbowPath(src, srcRef, tgt, tgtRef) {
+// Build an orthogonal (elbow) path between two points.
+// If arrow.bend is set, route src → bend → tgt as two straight segments.
+function idef0ElbowPath(src, srcRef, tgt, tgtRef, bend) {
   const sx = src.x, sy = src.y, tx = tgt.x, ty = tgt.y;
+
+  // User-placed bend point overrides auto-routing
+  if (bend) {
+    return `M ${sx.toFixed(1)},${sy.toFixed(1)} L ${bend.x.toFixed(1)},${bend.y.toFixed(1)} L ${tx.toFixed(1)},${ty.toFixed(1)}`;
+  }
+
   const srcParsed = idef0ParseRef(srcRef);
-  const tgtParsed = idef0ParseRef(tgtRef);
+  const srcSide   = srcParsed?.kind === 'box' ? srcParsed.side : null;
 
-  // Determine exit/enter directions
-  const srcSide  = srcParsed?.kind === 'box' ? srcParsed.side : null;
-  const tgtSide  = tgtParsed?.kind === 'box' ? tgtParsed.side : null;
-
-  // Simple L-shape or S-shape routing
   let mx1, my1, mx2, my2;
   const midX = (sx + tx) / 2;
   const midY = (sy + ty) / 2;
@@ -2482,12 +2484,24 @@ function idef0ElbowPath(src, srcRef, tgt, tgtRef) {
     mx1 = sx; my1 = midY;
     mx2 = tx; my2 = midY;
   } else {
-    // edge → box: go horizontal then vertical
     mx1 = tx; my1 = sy;
     mx2 = tx; my2 = ty;
   }
 
   return `M ${sx.toFixed(1)},${sy.toFixed(1)} L ${mx1.toFixed(1)},${my1.toFixed(1)} L ${mx2.toFixed(1)},${my2.toFixed(1)} L ${tx.toFixed(1)},${ty.toFixed(1)}`;
+}
+
+// Compute the default bend midpoint for an arrow (used for placing the bend handle)
+function idef0DefaultBend(src, srcRef, tgt) {
+  const sx = src.x, sy = src.y, tx = tgt.x, ty = tgt.y;
+  const srcParsed = idef0ParseRef(srcRef);
+  const srcSide   = srcParsed?.kind === 'box' ? srcParsed.side : null;
+  if (srcSide === 'right' || srcSide === 'left') {
+    return { x: (sx + tx) / 2, y: (sy + ty) / 2 };
+  } else if (srcSide === 'top' || srcSide === 'bottom') {
+    return { x: (sx + tx) / 2, y: (sy + ty) / 2 };
+  }
+  return { x: tx, y: (sy + ty) / 2 };
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2618,7 +2632,7 @@ function renderIDEF0Arrows() {
 
     const srcPt = idef0RefPoint(arrow.src);
     const tgtPt = idef0RefPoint(arrow.tgt);
-    const d = idef0ElbowPath(srcPt, arrow.src, tgtPt, arrow.tgt);
+    const d = idef0ElbowPath(srcPt, arrow.src, tgtPt, arrow.tgt, arrow.bend || null);
 
     const g = document.createElementNS(SVG_NS, 'g');
     g.setAttribute('data-idef0-arrow', arrow.id);
@@ -2646,18 +2660,62 @@ function renderIDEF0Arrows() {
     });
     g.appendChild(hit);
 
-    // Label near midpoint
+    // Label near midpoint / bend
     if (arrow.label) {
-      // Find midpoint of path (approximate: midpoint of src→tgt line)
-      const mx = (srcPt.x + tgtPt.x) / 2;
-      const my = (srcPt.y + tgtPt.y) / 2;
+      const bend = arrow.bend || idef0DefaultBend(srcPt, arrow.src, tgtPt);
       const lbl = document.createElementNS(SVG_NS, 'text');
-      lbl.setAttribute('x', mx);
-      lbl.setAttribute('y', my - 6);
+      lbl.setAttribute('x', bend.x);
+      lbl.setAttribute('y', bend.y - 7);
       lbl.setAttribute('text-anchor', 'middle');
       lbl.setAttribute('class', `idef0-arrow-lbl role-${role}`);
       lbl.textContent = arrow.label;
       g.appendChild(lbl);
+    }
+
+    // ── Drag handles (shown only when selected) ──────────────
+    if (isSel && IDEF0.tool === 'select') {
+      const HANDLE_R = 6;
+      const roleColor = { i:'#3b82f6', c:'#f59e0b', o:'#22c55e', m:'#a855f7' }[role] || '#fff';
+
+      // Endpoint handles — only for EDGE refs (free-floating ends)
+      [{ ref: arrow.src, pt: srcPt, which: 'src' },
+       { ref: arrow.tgt, pt: tgtPt, which: 'tgt' }].forEach(({ ref, pt, which }) => {
+        if (!ref || !ref.startsWith('EDGE:')) return;
+        const h = document.createElementNS(SVG_NS, 'circle');
+        h.setAttribute('cx', pt.x); h.setAttribute('cy', pt.y);
+        h.setAttribute('r', HANDLE_R);
+        h.setAttribute('fill', roleColor);
+        h.setAttribute('stroke', '#fff');
+        h.setAttribute('stroke-width', '1.5');
+        h.style.cursor = 'move';
+        h.addEventListener('mousedown', ev => {
+          ev.stopPropagation(); ev.preventDefault();
+          idef0StartEndpointDrag(ev, arrow, which);
+        });
+        g.appendChild(h);
+      });
+
+      // Bend handle — at current bend or computed default midpoint
+      const bendPt = arrow.bend || idef0DefaultBend(srcPt, arrow.src, tgtPt);
+      const bh = document.createElementNS(SVG_NS, 'rect');
+      bh.setAttribute('x', bendPt.x - HANDLE_R); bh.setAttribute('y', bendPt.y - HANDLE_R);
+      bh.setAttribute('width', HANDLE_R * 2);     bh.setAttribute('height', HANDLE_R * 2);
+      bh.setAttribute('fill', '#fff');
+      bh.setAttribute('stroke', roleColor);
+      bh.setAttribute('stroke-width', '1.5');
+      bh.setAttribute('rx', '2');
+      bh.style.cursor = 'move';
+      bh.addEventListener('mousedown', ev => {
+        ev.stopPropagation(); ev.preventDefault();
+        idef0StartBendDrag(ev, arrow);
+      });
+      bh.addEventListener('dblclick', ev => {
+        ev.stopPropagation();
+        arrow.bend = null; // reset to auto-routing
+        scheduleIDEF0Autosave();
+        renderIDEF0();
+      });
+      g.appendChild(bh);
     }
 
     layer.appendChild(g);
@@ -2714,6 +2772,51 @@ function idef0StartDrag(ev, box) {
   }
   function onUp() {
     idef0Drag = null;
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  }
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+}
+
+// Drag a free EDGE endpoint of a selected arrow
+function idef0StartEndpointDrag(ev, arrow, which) {
+  const wrap = document.getElementById('idef0-wrap');
+  const rect = wrap.getBoundingClientRect();
+  const startX = ev.clientX, startY = ev.clientY;
+  const parsed = idef0ParseRef(arrow[which]);
+  const ox = parsed.x, oy = parsed.y;
+
+  function onMove(e) {
+    const dx = e.clientX - startX, dy = e.clientY - startY;
+    const nx = snapGrid(ox + dx), ny = snapGrid(oy + dy);
+    arrow[which] = `EDGE:${nx}:${ny}`;
+    renderIDEF0();
+  }
+  function onUp() {
+    scheduleIDEF0Autosave();
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  }
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+}
+
+// Drag the bend (midpoint) handle of a selected arrow
+function idef0StartBendDrag(ev, arrow) {
+  const startX = ev.clientX, startY = ev.clientY;
+  const srcPt  = idef0RefPoint(arrow.src);
+  const tgtPt  = idef0RefPoint(arrow.tgt);
+  const initial = arrow.bend || idef0DefaultBend(srcPt, arrow.src, tgtPt);
+  const ox = initial.x, oy = initial.y;
+
+  function onMove(e) {
+    const dx = e.clientX - startX, dy = e.clientY - startY;
+    arrow.bend = { x: snapGrid(ox + dx), y: snapGrid(oy + dy) };
+    renderIDEF0();
+  }
+  function onUp() {
+    scheduleIDEF0Autosave();
     document.removeEventListener('mousemove', onMove);
     document.removeEventListener('mouseup', onUp);
   }
