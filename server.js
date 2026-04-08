@@ -7,6 +7,7 @@ const SQLiteStore = require('connect-sqlite3')(session);
 const { requireLogin, requireAdmin } = require('./middleware/auth');
 const authRouter   = require('./routes/auth');
 const modelsRouter = require('./routes/models');
+const idef0Router  = require('./routes/idef0');
 const adminRouter  = require('./routes/admin');
 
 const PORT           = process.env.PORT || 3000;
@@ -31,6 +32,7 @@ app.use(session({
 
 app.use('/auth', authRouter);
 app.use('/api/models', requireLogin, modelsRouter);
+app.use('/api/idef0',  requireLogin, idef0Router);
 app.use('/admin', requireLogin, requireAdmin, adminRouter);
 
 app.get('/', requireLogin, (req, res) => {

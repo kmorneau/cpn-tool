@@ -567,11 +567,22 @@ input, textarea, select { font-family: var(--mono); color: var(--text); backgrou
     <button class="export-btn" id="btn-help" title="?">?</button>
     <input type="file" id="file-inp" accept=".cpn,.txt,.pnml" style="display:none">
     <div class="sep"></div>
-    <select id="model-select" class="export-btn" style="width:130px;cursor:pointer;background:var(--bg3)">
-      <option value="">— models —</option>
-    </select>
-    <button class="export-btn" id="btn-save-model" title="Save current model">Save</button>
-    <button class="export-btn" id="btn-save-as-model" title="Save as new model">Save As</button>
+    <!-- CPN model selector (hidden in IDEF0 mode) -->
+    <span id="cpn-save-bar">
+      <select id="model-select" class="export-btn" style="width:130px;cursor:pointer;background:var(--bg3)">
+        <option value="">— models —</option>
+      </select>
+      <button class="export-btn" id="btn-save-model" title="Save current CPN model">Save</button>
+      <button class="export-btn" id="btn-save-as-model" title="Save as new CPN model">Save As</button>
+    </span>
+    <!-- IDEF0 diagram selector (visible only in IDEF0 mode) -->
+    <span id="idef0-save-bar" style="display:none">
+      <select id="idef0-select" class="export-btn" style="width:130px;cursor:pointer;background:var(--bg3)">
+        <option value="">— diagrams —</option>
+      </select>
+      <button class="export-btn" id="btn-save-idef0" title="Save current IDEF0 diagram">Save</button>
+      <button class="export-btn" id="btn-save-as-idef0" title="Save as new IDEF0 diagram">Save As</button>
+    </span>
     <div class="sep"></div>
     <span id="user-info" style="font-size:15px;color:var(--text2);padding:0 4px"></span>
     <a id="admin-link" href="/admin" style="display:none" class="export-btn">Admin</a>
@@ -2176,6 +2187,8 @@ function switchMode(mode) {
     simControls.style.display = 'none';
     cpnTools.classList.add('mode-idef0');
     idef0Tools.classList.add('mode-idef0');
+    document.getElementById('cpn-save-bar').style.display  = 'none';
+    document.getElementById('idef0-save-bar').style.display = '';
     // Load example on first open if empty
     if (!IDEF0._exampleLoaded && !IDEF0.boxes.length) {
       IDEF0._exampleLoaded = true;
@@ -2189,6 +2202,8 @@ function switchMode(mode) {
     cpnTools.classList.remove('mode-idef0');
     idef0Tools.classList.remove('mode-idef0');
     simControls.style.display = '';
+    document.getElementById('cpn-save-bar').style.display  = '';
+    document.getElementById('idef0-save-bar').style.display = 'none';
 
     if (mode === 'text') {
       canvasWrap.style.display = 'none';
@@ -2225,49 +2240,38 @@ document.querySelectorAll('.mode-tab').forEach(b => b.addEventListener('click', 
 // ═══════════════════════════════════════════════════════════
 
 /**
- * Serialize IDEF0 + active CPN into a single string for cloud save / .cpn export.
- * Format:
- *   // @IDEF0:<base64-JSON>
- *   <CPN text>
- *
- * The header stores all boxes (with embedded cpnData) and arrows.
- * If currently drilled into a box, its live CPN is captured first.
+ * Serialize the IDEF0 diagram to a JSON string for /api/idef0 storage.
+ * If currently drilled into a box, that box's live CPN is captured first.
+ * Each box's cpnData stores the raw model snapshot (captureModelData()).
  */
-function serializeModel() {
-  // Capture live CPN back into the active box before saving
+function serializeIDEF0() {
   if (IDEF0.activeBox) {
     const box = idef0FindBox(IDEF0.activeBox);
     if (box) box.cpnData = captureModelData();
   }
-  const payload = {
-    boxes:     IDEF0.boxes,
-    arrows:    IDEF0.arrows,
-    nc:        IDEF0.nc,
-    ac:        IDEF0.ac,
-    activeBox: IDEF0.activeBox,
-  };
-  return '// @IDEF0:' + btoa(unescape(encodeURIComponent(JSON.stringify(payload)))) + '\n' + serializeCPN();
+  return JSON.stringify({
+    boxes:  IDEF0.boxes,
+    arrows: IDEF0.arrows,
+    nc:     IDEF0.nc,
+    ac:     IDEF0.ac,
+  });
 }
 
 /**
- * Strip the @IDEF0 header from model content (if present), restore IDEF0
- * state, and return the plain CPN text for the editor / parseCPN.
+ * Restore IDEF0 state from a JSON string previously produced by serializeIDEF0().
  */
-function deserializeModel(src) {
-  const lines = src.split('\n');
-  if (lines[0].startsWith('// @IDEF0:')) {
-    try {
-      const payload = JSON.parse(decodeURIComponent(escape(atob(lines[0].slice('// @IDEF0:'.length)))));
-      IDEF0.boxes     = payload.boxes   || [];
-      IDEF0.arrows    = payload.arrows  || [];
-      IDEF0.nc        = payload.nc      || IDEF0.boxes.length;
-      IDEF0.ac        = payload.ac      || IDEF0.arrows.length;
-      IDEF0.activeBox = payload.activeBox || null;
-      IDEF0._exampleLoaded = true; // don't overwrite restored diagram with the demo
-    } catch(e) { /* malformed header — treat as plain CPN */ }
-    return lines.slice(1).join('\n');
+function deserializeIDEF0(json) {
+  try {
+    const d = JSON.parse(json);
+    IDEF0.boxes     = d.boxes   || [];
+    IDEF0.arrows    = d.arrows  || [];
+    IDEF0.nc        = d.nc      || IDEF0.boxes.length;
+    IDEF0.ac        = d.ac      || IDEF0.arrows.length;
+    IDEF0.activeBox = null;
+    IDEF0._exampleLoaded = true;
+  } catch(e) {
+    log('Failed to load IDEF0 diagram', 'error');
   }
-  return src;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2620,6 +2624,7 @@ function openIDEF0ArrowModal(srcRef, tgtRef) {
     };
     IDEF0.arrows.push(arrow);
     cleanup();
+    if (typeof scheduleIDEF0Autosave === 'function') scheduleIDEF0Autosave();
     renderIDEF0();
   }
   function onCancel() { cleanup(); }
@@ -2666,12 +2671,14 @@ function idef0DeleteBox(id) {
            !(a.tgt && a.tgt.startsWith('BOX:' + id));
   });
   if (IDEF0.selected?.id === id) IDEF0.selected = null;
+  if (typeof scheduleIDEF0Autosave === 'function') scheduleIDEF0Autosave();
   renderIDEF0();
 }
 
 function idef0DeleteArrow(id) {
   IDEF0.arrows = IDEF0.arrows.filter(a => a.id !== id);
   if (IDEF0.selected?.id === id) IDEF0.selected = null;
+  if (typeof scheduleIDEF0Autosave === 'function') scheduleIDEF0Autosave();
   renderIDEF0();
 }
 
@@ -2694,6 +2701,7 @@ document.getElementById('idef0-svg').addEventListener('click', ev => {
     IDEF0.selected = { type: 'box', id };
     // Prompt for label immediately
     openIDEF0BoxModal(box);
+    if (typeof scheduleIDEF0Autosave === 'function') scheduleIDEF0Autosave();
     renderIDEF0();
     return;
   }
@@ -2854,6 +2862,7 @@ function idef0NavigateUp() {
   if (box) box.cpnData = captureModelData();
   IDEF0.activeBox = null;
   document.getElementById('breadcrumb').classList.remove('visible');
+  if (typeof scheduleIDEF0Autosave === 'function') scheduleIDEF0Autosave();
   switchMode('idef0');
 }
 
@@ -2947,7 +2956,7 @@ document.getElementById('btn-png').addEventListener('click',()=>{
   };img.src=url;
 });
 document.getElementById('btn-pnml').addEventListener('click',()=>dl(serializePNML(),'net.pnml','application/xml'));
-document.getElementById('btn-cpn').addEventListener('click',()=>dl(serializeModel(),'net.cpn','text/plain'));
+document.getElementById('btn-cpn').addEventListener('click',()=>dl(serializeCPN(),'net.cpn','text/plain'));
 document.getElementById('btn-import').addEventListener('click',()=>document.getElementById('file-inp').click());
 document.getElementById('file-inp').addEventListener('change',ev=>{
   const f=ev.target.files[0];if(!f)return;
@@ -2964,11 +2973,8 @@ function loadFromText(src) {
   document.getElementById('deadlock-badge').style.display='none';
   document.getElementById('no-analysis').style.display='';
   document.getElementById('analysis-results').style.display='none';
-  // Strip @IDEF0 header (restores IDEF0 state as a side effect)
-  const cpnSrc = deserializeModel(src);
-  ed.value=cpnSrc;updateHL();applyText();
+  ed.value=src;updateHL();applyText();
   if(S.mode==='text')return;
-  if(S.mode==='idef0'){renderIDEF0();return;}
   autoLayout();render();fitToScreen();
   log('Net loaded','system');
 }
@@ -3065,10 +3071,86 @@ async function cloudSave() {
     await fetch(`/api/models/${currentModelId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: serializeModel() }),
+      body: JSON.stringify({ content: serializeCPN() }),
     });
   } catch(e) {}
 }
+
+// ── IDEF0 cloud save ─────────────────────────────────────────
+let currentIDEF0Id = null;
+let idef0SaveTimer = null;
+
+async function idef0CloudSave() {
+  if (!currentIDEF0Id) return;
+  try {
+    await fetch(`/api/idef0/${currentIDEF0Id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: serializeIDEF0() }),
+    });
+  } catch(e) {}
+}
+
+function scheduleIDEF0Autosave() {
+  clearTimeout(idef0SaveTimer);
+  idef0SaveTimer = setTimeout(idef0CloudSave, 15000);
+}
+
+setInterval(idef0CloudSave, 60000);
+
+async function refreshIDEF0List() {
+  const res = await fetch('/api/idef0');
+  if (!res.ok) return;
+  const diagrams = await res.json();
+  const sel = document.getElementById('idef0-select');
+  sel.replaceChildren();
+  const placeholder = document.createElement('option');
+  placeholder.value = ''; placeholder.textContent = '— diagrams —';
+  sel.appendChild(placeholder);
+  diagrams.forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d.id; opt.textContent = d.name;
+    if (d.id === currentIDEF0Id) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+document.getElementById('idef0-select').addEventListener('change', async ev => {
+  const id = parseInt(ev.target.value);
+  if (!id) return;
+  const res = await fetch(`/api/idef0/${id}`);
+  if (!res.ok) return;
+  const diagram = await res.json();
+  currentIDEF0Id = diagram.id;
+  deserializeIDEF0(diagram.content);
+  renderIDEF0();
+  log(`IDEF0 diagram "${esc(diagram.name)}" loaded`, 'system');
+});
+
+document.getElementById('btn-save-idef0').addEventListener('click', async () => {
+  if (!currentIDEF0Id) { document.getElementById('btn-save-as-idef0').click(); return; }
+  await idef0CloudSave();
+  log('IDEF0 diagram saved', 'system');
+});
+
+document.getElementById('btn-save-as-idef0').addEventListener('click', async () => {
+  const name = prompt('Diagram name:');
+  if (!name || !name.trim()) return;
+  const res = await fetch('/api/idef0', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: name.trim(), content: serializeIDEF0() }),
+  });
+  if (res.ok) {
+    const diagram = await res.json();
+    currentIDEF0Id = diagram.id;
+    await refreshIDEF0List();
+    log(`IDEF0 diagram saved as "${esc(name.trim())}"`, 'system');
+  } else {
+    const err = await res.json();
+    log(`Save failed: ${esc(err.error || 'unknown error')}`, 'warn');
+  }
+});
 
 function scheduleAutosave() {
   clearTimeout(saveTimer);
@@ -3116,7 +3198,7 @@ document.getElementById('btn-save-as-model').addEventListener('click', async () 
   const res = await fetch('/api/models', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: name.trim(), content: serializeModel() }),
+    body: JSON.stringify({ name: name.trim(), content: serializeCPN() }),
   });
   if (res.ok) {
     const model = await res.json();
@@ -3155,8 +3237,8 @@ async function boot() {
   log(`Signed in as ${user.username}`, 'system');
   log('Press ? for keyboard shortcuts', 'system');
 
+  // Load CPN models list + most recent model
   await refreshModelList();
-
   const listRes = await fetch('/api/models');
   const models = listRes.ok ? await listRes.json() : [];
   if (models.length) {
@@ -3171,6 +3253,21 @@ async function boot() {
     loadFromText(EXAMPLES.producer);
   }
   applyTransform();
+
+  // Load IDEF0 diagrams list + most recent diagram (if any)
+  await refreshIDEF0List();
+  const idef0Res = await fetch('/api/idef0');
+  const diagrams = idef0Res.ok ? await idef0Res.json() : [];
+  if (diagrams.length) {
+    const fullRes = await fetch(`/api/idef0/${diagrams[0].id}`);
+    if (fullRes.ok) {
+      const diagram = await fullRes.json();
+      currentIDEF0Id = diagram.id;
+      deserializeIDEF0(diagram.content);
+      document.getElementById('idef0-select').value = diagram.id;
+      log(`IDEF0 diagram "${esc(diagram.name)}" loaded`, 'system');
+    }
+  }
 }
 
 boot();

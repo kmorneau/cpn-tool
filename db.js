@@ -33,6 +33,18 @@ db.exec(`
 
   CREATE UNIQUE INDEX IF NOT EXISTS idx_models_user_name ON models(user_id, name);
   CREATE INDEX IF NOT EXISTS idx_models_user ON models(user_id);
+
+  CREATE TABLE IF NOT EXISTS idef0_diagrams (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name        TEXT    NOT NULL,
+    content     TEXT    NOT NULL,
+    created_at  INTEGER NOT NULL DEFAULT (unixepoch()),
+    updated_at  INTEGER NOT NULL DEFAULT (unixepoch())
+  );
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_idef0_user_name ON idef0_diagrams(user_id, name);
+  CREATE INDEX IF NOT EXISTS idx_idef0_user ON idef0_diagrams(user_id);
 `);
 
 module.exports = {
@@ -62,5 +74,12 @@ module.exports = {
     update:      db.prepare(`UPDATE models SET name = COALESCE(?, name), content = COALESCE(?, content), updated_at = unixepoch() WHERE id = ? AND user_id = ?`),
     delete:      db.prepare(`DELETE FROM models WHERE id = ? AND user_id = ?`),
     listForUser: db.prepare(`SELECT id, name, created_at, updated_at FROM models WHERE user_id = ? ORDER BY updated_at DESC`),
+  },
+  idef0: {
+    list:     db.prepare(`SELECT id, name, created_at, updated_at FROM idef0_diagrams WHERE user_id = ? ORDER BY updated_at DESC`),
+    create:   db.prepare(`INSERT INTO idef0_diagrams (user_id, name, content) VALUES (?, ?, ?)`),
+    findById: db.prepare(`SELECT * FROM idef0_diagrams WHERE id = ? AND user_id = ?`),
+    update:   db.prepare(`UPDATE idef0_diagrams SET name = COALESCE(?, name), content = COALESCE(?, content), updated_at = unixepoch() WHERE id = ? AND user_id = ?`),
+    delete:   db.prepare(`DELETE FROM idef0_diagrams WHERE id = ? AND user_id = ?`),
   },
 };
