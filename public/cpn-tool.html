@@ -2221,6 +2221,56 @@ document.querySelectorAll('.mode-tab').forEach(b => b.addEventListener('click', 
 }));
 
 // ═══════════════════════════════════════════════════════════
+// IDEF0 — SERIALIZE / DESERIALIZE
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * Serialize IDEF0 + active CPN into a single string for cloud save / .cpn export.
+ * Format:
+ *   // @IDEF0:<base64-JSON>
+ *   <CPN text>
+ *
+ * The header stores all boxes (with embedded cpnData) and arrows.
+ * If currently drilled into a box, its live CPN is captured first.
+ */
+function serializeModel() {
+  // Capture live CPN back into the active box before saving
+  if (IDEF0.activeBox) {
+    const box = idef0FindBox(IDEF0.activeBox);
+    if (box) box.cpnData = captureModelData();
+  }
+  const payload = {
+    boxes:     IDEF0.boxes,
+    arrows:    IDEF0.arrows,
+    nc:        IDEF0.nc,
+    ac:        IDEF0.ac,
+    activeBox: IDEF0.activeBox,
+  };
+  return '// @IDEF0:' + btoa(unescape(encodeURIComponent(JSON.stringify(payload)))) + '\n' + serializeCPN();
+}
+
+/**
+ * Strip the @IDEF0 header from model content (if present), restore IDEF0
+ * state, and return the plain CPN text for the editor / parseCPN.
+ */
+function deserializeModel(src) {
+  const lines = src.split('\n');
+  if (lines[0].startsWith('// @IDEF0:')) {
+    try {
+      const payload = JSON.parse(decodeURIComponent(escape(atob(lines[0].slice('// @IDEF0:'.length)))));
+      IDEF0.boxes     = payload.boxes   || [];
+      IDEF0.arrows    = payload.arrows  || [];
+      IDEF0.nc        = payload.nc      || IDEF0.boxes.length;
+      IDEF0.ac        = payload.ac      || IDEF0.arrows.length;
+      IDEF0.activeBox = payload.activeBox || null;
+      IDEF0._exampleLoaded = true; // don't overwrite restored diagram with the demo
+    } catch(e) { /* malformed header — treat as plain CPN */ }
+    return lines.slice(1).join('\n');
+  }
+  return src;
+}
+
+// ═══════════════════════════════════════════════════════════
 // IDEF0 — HELPERS
 // ═══════════════════════════════════════════════════════════
 function idef0FindBox(id)   { return IDEF0.boxes.find(b => b.id === id); }
@@ -2897,7 +2947,7 @@ document.getElementById('btn-png').addEventListener('click',()=>{
   };img.src=url;
 });
 document.getElementById('btn-pnml').addEventListener('click',()=>dl(serializePNML(),'net.pnml','application/xml'));
-document.getElementById('btn-cpn').addEventListener('click',()=>dl(serializeCPN(),'net.cpn','text/plain'));
+document.getElementById('btn-cpn').addEventListener('click',()=>dl(serializeModel(),'net.cpn','text/plain'));
 document.getElementById('btn-import').addEventListener('click',()=>document.getElementById('file-inp').click());
 document.getElementById('file-inp').addEventListener('change',ev=>{
   const f=ev.target.files[0];if(!f)return;
@@ -2914,8 +2964,11 @@ function loadFromText(src) {
   document.getElementById('deadlock-badge').style.display='none';
   document.getElementById('no-analysis').style.display='';
   document.getElementById('analysis-results').style.display='none';
-  ed.value=src;updateHL();applyText();
+  // Strip @IDEF0 header (restores IDEF0 state as a side effect)
+  const cpnSrc = deserializeModel(src);
+  ed.value=cpnSrc;updateHL();applyText();
   if(S.mode==='text')return;
+  if(S.mode==='idef0'){renderIDEF0();return;}
   autoLayout();render();fitToScreen();
   log('Net loaded','system');
 }
@@ -3012,7 +3065,7 @@ async function cloudSave() {
     await fetch(`/api/models/${currentModelId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: serializeCPN() }),
+      body: JSON.stringify({ content: serializeModel() }),
     });
   } catch(e) {}
 }
@@ -3063,7 +3116,7 @@ document.getElementById('btn-save-as-model').addEventListener('click', async () 
   const res = await fetch('/api/models', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: name.trim(), content: serializeCPN() }),
+    body: JSON.stringify({ name: name.trim(), content: serializeModel() }),
   });
   if (res.ok) {
     const model = await res.json();
