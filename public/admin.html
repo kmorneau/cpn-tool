@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CPN Tool — Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #07101e;  --bg2:      #09162a;  --bg3:      #0d1f38;
+  --border:   #0e2540;  --border2:  #183860;
+  --place-hi: #3b82f6;  --place:    #1d4ed8;  --enabled:  #60a5fa;
+  --text:     #dce8f4;  --text2:    #7aaacb;  --text3:    #4a7090;
+  --red:      #dc2626;  --green:    #16a34a;  --amber:    #d97706;
+  --mono: 'IBM Plex Mono', monospace;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg); font-family: var(--mono); color: var(--text); }
+
+/* Top bar */
+#topbar {
+  height: 44px; background: #050d18; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 16px; gap: 16px; user-select: none;
+}
+.logo-cpn  { font-size: 19px; font-weight: 700; color: var(--place-hi); letter-spacing: -1px; }
+.logo-tool { font-size: 15px; color: var(--text3); letter-spacing: 3px; }
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.tb-btn {
+  padding: 4px 12px; font-size: 15px; letter-spacing: 1px; text-transform: uppercase;
+  border-radius: 3px; border: 1px solid var(--border2); background: transparent;
+  color: var(--text2); cursor: pointer; font-family: var(--mono); text-decoration: none;
+  display: inline-flex; align-items: center;
+}
+.tb-btn:hover { color: var(--text); border-color: var(--text2); }
+.tb-btn.primary { border-color: var(--place); color: var(--enabled); }
+
+/* Layout */
+#content { padding: 24px; max-width: 1100px; margin: 0 auto; }
+h2 { font-size: 19px; color: var(--text); margin-bottom: 16px; letter-spacing: 1px; }
+
+/* Table */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th {
+  text-align: left; padding: 8px 12px; font-size: 15px; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--text3); border-bottom: 1px solid var(--border2);
+}
+td { padding: 9px 12px; border-bottom: 1px solid var(--border); color: var(--text2); vertical-align: middle; }
+tr:hover td { background: var(--bg2); }
+.badge {
+  display: inline-block; padding: 2px 7px; border-radius: 2px; font-size: 15px;
+  letter-spacing: 1px; text-transform: uppercase;
+}
+.badge-admin { background: #0d1f38; color: var(--place-hi); border: 1px solid var(--place); }
+.badge-user  { background: #0a140a; color: #4ade80;          border: 1px solid var(--green); }
+
+.act-btn {
+  padding: 3px 9px; font-size: 15px; border-radius: 2px; border: 1px solid var(--border2);
+  background: transparent; color: var(--text2); cursor: pointer; font-family: var(--mono);
+  margin-right: 4px;
+}
+.act-btn:hover { color: var(--text); border-color: var(--text2); }
+.act-btn.danger { border-color: var(--red); color: var(--red); }
+.act-btn.danger:hover { background: #1a0505; }
+
+/* Modal */
+#overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+  z-index: 500; display: none; align-items: center; justify-content: center;
+}
+#overlay.open { display: flex; }
+.modal {
+  background: var(--bg2); border: 1px solid var(--border2);
+  border-radius: 6px; padding: 24px; width: 380px; max-width: 90vw;
+}
+.modal h3 { font-size: 15px; color: var(--text); margin-bottom: 18px; letter-spacing: 1px; }
+.field { margin-bottom: 12px; }
+.lbl { font-size: 15px; letter-spacing: 1.5px; color: var(--text3); text-transform: uppercase; margin-bottom: 4px; }
+.inp, .sel {
+  width: 100%; background: var(--bg3); border: 1px solid var(--border2);
+  border-radius: 3px; color: var(--text); font-family: var(--mono);
+  font-size: 15px; padding: 7px 9px; outline: none;
+}
+.inp:focus, .sel:focus { border-color: var(--place-hi); }
+.modal-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+.modal-btn {
+  padding: 6px 16px; font-size: 19px; border-radius: 3px; border: 1px solid var(--border2);
+  background: transparent; color: var(--text2); cursor: pointer; font-family: var(--mono);
+}
+.modal-btn.ok { border-color: var(--place); color: var(--enabled); }
+.modal-btn:hover { opacity: 0.8; }
+.modal-err { font-size: 13px; color: #f87171; margin-top: 10px; display: none; }
+
+/* Models drawer */
+#models-drawer {
+  position: fixed; right: 0; top: 0; bottom: 0; width: 340px;
+  background: var(--bg2); border-left: 1px solid var(--border2);
+  z-index: 400; display: none; flex-direction: column;
+}
+#models-drawer.open { display: flex; }
+.drawer-hdr {
+  padding: 14px 18px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+}
+.drawer-hdr h3 { font-size: 14px; color: var(--text); flex: 1; }
+.drawer-close { border: none; background: none; color: var(--text3); cursor: pointer; font-size: 19px; }
+.drawer-list { flex: 1; overflow-y: auto; padding: 8px 0; }
+.drawer-item { padding: 8px 18px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.drawer-item .model-name { color: var(--text); }
+.drawer-item .model-meta { color: var(--text3); font-size: 15px; margin-top: 2px; }
+.empty { padding: 18px; color: var(--text3); font-size: 19px; text-align: center; }
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <span class="logo-cpn">cpn</span>
+  <span class="logo-tool">ADMIN</span>
+  <div class="topbar-right">
+    <span id="me-name" style="font-size:15px;color:var(--text3)"></span>
+    <a href="/" class="tb-btn">← Tool</a>
+    <button class="tb-btn primary" onclick="openNewUser()">+ New User</button>
+    <button class="tb-btn" id="btn-logout">Logout</button>
+  </div>
+</div>
+
+<div id="content">
+  <h2>USER ADMINISTRATION</h2>
+  <div class="table-wrap">
+    <table id="user-table">
+      <thead>
+        <tr>
+          <th>ID</th><th>Username</th><th>Email</th><th>Role</th>
+          <th>Created</th><th>Last Login</th><th>Models</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="user-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- User Modal -->
+<div id="overlay">
+  <div class="modal">
+    <h3 id="modal-title">New User</h3>
+    <div class="field"><div class="lbl">Username</div>
+      <input class="inp" id="m-username" type="text" autocomplete="off"></div>
+    <div class="field"><div class="lbl">Email</div>
+      <input class="inp" id="m-email" type="email" autocomplete="off"></div>
+    <div class="field"><div class="lbl">Password <span id="m-pass-hint" style="color:var(--text3)">(leave blank to keep)</span></div>
+      <input class="inp" id="m-password" type="password" autocomplete="new-password"></div>
+    <div class="field"><div class="lbl">Role</div>
+      <select class="sel" id="m-role">
+        <option value="user">user</option>
+        <option value="admin">admin</option>
+      </select>
+    </div>
+    <div class="modal-err" id="modal-err"></div>
+    <div class="modal-btns">
+      <button class="modal-btn" onclick="closeModal()">Cancel</button>
+      <button class="modal-btn ok" onclick="submitModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Models Drawer -->
+<div id="models-drawer">
+  <div class="drawer-hdr">
+    <h3 id="drawer-title">Models</h3>
+    <button class="drawer-close" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="drawer-list" id="drawer-list"></div>
+</div>
+
+<script>
+let users = [];
+let modalMode = 'create'; // 'create' | 'edit'
+let editUserId = null;
+let meId = null;
+
+async function init() {
+  const meRes = await fetch('/auth/me');
+  if (!meRes.ok) { window.location.href = '/login'; return; }
+  const me = await meRes.json();
+  meId = me.id;
+  document.getElementById('me-name').textContent = me.username;
+  await loadUsers();
+}
+
+async function loadUsers() {
+  const res = await fetch('/admin/api/users');
+  if (!res.ok) return;
+  users = await res.json();
+  renderTable();
+}
+
+function fmtDate(ts) {
+  if (!ts) return '—';
+  return new Date(ts * 1000).toLocaleDateString('en-CA', { year:'numeric', month:'short', day:'numeric' });
+}
+
+function renderTable() {
+  const tbody = document.getElementById('user-tbody');
+  tbody.replaceChildren();
+  users.forEach(u => {
+    const tr = document.createElement('tr');
+    const isSelf = u.id === meId;
+    tr.innerHTML = `
+      <td>${u.id}</td>
+      <td style="color:var(--text)">${u.username}${isSelf ? ' <span style="color:var(--text3);font-size:15px">(you)</span>' : ''}</td>
+      <td>${u.email}</td>
+      <td><span class="badge ${u.role === 'admin' ? 'badge-admin' : 'badge-user'}">${u.role}</span></td>
+      <td>${fmtDate(u.created_at)}</td>
+      <td>${fmtDate(u.last_login)}</td>
+      <td style="text-align:center">${u.model_count}</td>
+      <td>
+        <button class="act-btn" onclick="openEdit(${u.id})">Edit</button>
+        <button class="act-btn" onclick="viewModels(${u.id}, '${u.username}')">Models</button>
+        ${!isSelf ? `<button class="act-btn danger" onclick="deleteUser(${u.id}, '${u.username}')">Delete</button>` : ''}
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ── Modal ────────────────────────────────────────────────────────
+function openNewUser() {
+  modalMode = 'create';
+  editUserId = null;
+  document.getElementById('modal-title').textContent = 'New User';
+  document.getElementById('m-username').value = '';
+  document.getElementById('m-email').value = '';
+  document.getElementById('m-password').value = '';
+  document.getElementById('m-role').value = 'user';
+  document.getElementById('m-username').disabled = false;
+  document.getElementById('m-pass-hint').style.display = 'none';
+  document.getElementById('modal-err').style.display = 'none';
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('m-username').focus();
+}
+
+function openEdit(id) {
+  const u = users.find(x => x.id === id);
+  if (!u) return;
+  modalMode = 'edit';
+  editUserId = id;
+  document.getElementById('modal-title').textContent = `Edit — ${u.username}`;
+  document.getElementById('m-username').value = u.username;
+  document.getElementById('m-email').value = u.email;
+  document.getElementById('m-password').value = '';
+  document.getElementById('m-role').value = u.role;
+  document.getElementById('m-username').disabled = true;
+  document.getElementById('m-pass-hint').style.display = '';
+  document.getElementById('modal-err').style.display = 'none';
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('m-email').focus();
+}
+
+function closeModal() {
+  document.getElementById('overlay').classList.remove('open');
+}
+
+async function submitModal() {
+  const errEl = document.getElementById('modal-err');
+  errEl.style.display = 'none';
+
+  if (modalMode === 'create') {
+    const body = {
+      username: document.getElementById('m-username').value.trim(),
+      email:    document.getElementById('m-email').value.trim(),
+      password: document.getElementById('m-password').value,
+      role:     document.getElementById('m-role').value,
+    };
+    const res = await fetch('/admin/api/users', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const d = await res.json();
+      errEl.textContent = d.error; errEl.style.display = 'block'; return;
+    }
+  } else {
+    const body = {
+      email: document.getElementById('m-email').value.trim(),
+      role:  document.getElementById('m-role').value,
+    };
+    const pw = document.getElementById('m-password').value;
+    if (pw) body.password = pw;
+    const res = await fetch(`/admin/api/users/${editUserId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const d = await res.json();
+      errEl.textContent = d.error; errEl.style.display = 'block'; return;
+    }
+  }
+  closeModal();
+  await loadUsers();
+}
+
+async function deleteUser(id, username) {
+  if (!confirm(`Delete user "${username}" and all their models? This cannot be undone.`)) return;
+  const res = await fetch(`/admin/api/users/${id}`, { method: 'DELETE' });
+  if (!res.ok) { alert((await res.json()).error); return; }
+  await loadUsers();
+}
+
+// ── Models Drawer ────────────────────────────────────────────────
+async function viewModels(userId, username) {
+  document.getElementById('drawer-title').textContent = `${username}'s Models`;
+  const res = await fetch(`/admin/api/users/${userId}/models`);
+  const models = await res.json();
+  const list = document.getElementById('drawer-list');
+  list.replaceChildren();
+  if (!models.length) {
+    const d = document.createElement('div'); d.className = 'empty';
+    d.textContent = 'No models saved'; list.appendChild(d);
+  } else {
+    models.forEach(m => {
+      const d = document.createElement('div'); d.className = 'drawer-item';
+      const name = document.createElement('div'); name.className = 'model-name'; name.textContent = m.name;
+      const meta = document.createElement('div'); meta.className = 'model-meta';
+      meta.textContent = `Updated ${fmtDate(m.updated_at)}`;
+      d.appendChild(name); d.appendChild(meta); list.appendChild(d);
+    });
+  }
+  document.getElementById('models-drawer').classList.add('open');
+}
+
+function closeDrawer() {
+  document.getElementById('models-drawer').classList.remove('open');
+}
+
+document.getElementById('overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('overlay')) closeModal();
+});
+
+document.getElementById('btn-logout').addEventListener('click', async () => {
+  await fetch('/auth/logout', { method: 'POST' });
+  window.location.href = '/login';
+});
+
+init();
+</script>
+</body>
+</html>

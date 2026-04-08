@@ -1,0 +1,1870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CPN Tool — Test Suite (92 tests)</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#07101e;--bg2:#0a1628;--bg3:#0d1f38;--border:#0e2540;--border2:#183860;
+  --green:#16a34a;--red:#dc2626;--amber:#d97706;--blue:#2563eb;--text:#6b8fae;--text2:#3a6080;
+  --mono:'IBM Plex Mono',monospace;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);font-size:12px;padding:24px;}
+h1{color:#3b82f6;font-size:16px;letter-spacing:-0.5px;margin-bottom:4px;}
+.sub{color:var(--text2);font-size:10px;letter-spacing:1px;margin-bottom:20px;}
+#summary{display:flex;gap:20px;padding:12px 16px;margin-bottom:20px;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;}
+.si{display:flex;flex-direction:column;gap:2px;}
+.sl{font-size:9px;letter-spacing:2px;color:var(--text2);text-transform:uppercase;}
+.sv{font-size:20px;font-weight:700;}
+.sv.p{color:#22c55e;}.sv.f{color:var(--red);}.sv.t{color:#60a5fa;}.sv.tm{color:var(--amber);}
+#run-btn{margin-left:auto;align-self:center;padding:8px 20px;font-size:10px;letter-spacing:1.5px;border:1px solid var(--blue);border-radius:4px;background:#071830;color:#60a5fa;cursor:pointer;font-family:var(--mono);text-transform:uppercase;}
+#run-btn:hover{background:#0a2040;}
+.suite{margin-bottom:14px;border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+.sh{display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--bg2);border-bottom:1px solid var(--border);cursor:pointer;}
+.sn{font-size:11px;font-weight:600;color:#7fb3d3;}
+.sb{margin-left:auto;font-size:9px;padding:2px 8px;border-radius:2px;letter-spacing:1px;}
+.sb.ok{background:#051508;color:#22c55e;border:1px solid var(--green);}
+.sb.no{background:#150505;color:var(--red);border:1px solid var(--red);}
+.st{font-size:9px;color:var(--text2);}
+.tbody{display:none;padding:4px 0;}
+.tbody.open{display:block;}
+.tr{display:flex;align-items:flex-start;gap:10px;padding:4px 14px;font-size:10px;border-bottom:1px solid #0a1830;}
+.tr:last-child{border-bottom:none;}
+.ti{flex-shrink:0;width:14px;font-size:11px;margin-top:1px;}
+.tp{color:#22c55e;}.tf{color:var(--red);}
+.tn{flex:1;color:var(--text);}
+.te{font-size:9px;color:#f87171;margin-top:2px;white-space:pre-wrap;background:#0f0404;padding:4px 8px;border-radius:3px;border-left:2px solid var(--red);}
+.tt{flex-shrink:0;font-size:9px;color:var(--text2);}
+#prog{height:3px;background:var(--border);margin-bottom:20px;border-radius:1px;overflow:hidden;}
+#pb{height:100%;background:var(--blue);width:0;transition:width 0.1s;}
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+</style>
+</head>
+<body>
+<h1>cpn<span style="font-weight:300;color:var(--text2)">tool</span> — Test Suite</h1>
+<div class="sub">92 TESTS · 9 SUITES · SELF-CONTAINED</div>
+<div id="summary">
+  <div class="si"><div class="sl">Pass</div><div class="sv p" id="sp">—</div></div>
+  <div class="si"><div class="sl">Fail</div><div class="sv f" id="sf">—</div></div>
+  <div class="si"><div class="sl">Total</div><div class="sv t" id="st">92</div></div>
+  <div class="si"><div class="sl">Time</div><div class="sv tm" id="stm">—</div></div>
+  <button id="run-btn">&#9654; Run All</button>
+</div>
+<div id="prog"><div id="pb"></div></div>
+<div id="suites"></div>
+
+<script>
+// Tool factory — provides sandboxed scope for testing
+function createToolScope(injectedS, mockDocument, mockStorage) {
+  const document = mockDocument;
+  const localStorage = mockStorage;
+  const performance = { now: () => Date.now() };
+  const URL = { createObjectURL: () => '#', revokeObjectURL: () => {} };
+  class Blob { constructor(p, o) { this.parts = p; } }
+  class XMLSerializer { serializeToString(el) { return '<svg/>'; } }
+  class Image { set src(v) { setTimeout(() => this.onload?.(), 0); } }
+
+'use strict';
+// ═══════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════
+const PLACE_R = 46, TW = 90, TH = 40, GRID = 24;
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+// ═══════════════════════════════════════════════════════════
+// APPLICATION STATE
+// ═══════════════════════════════════════════════════════════
+const S = {
+  places: [], transitions: [], arcs: [], colorsets: {},
+  selected: null,
+  tool: 'select',
+  mode: 'visual',
+  snap: true,
+  // Canvas transform
+  tx: 0, ty: 0, scale: 1,
+  // Arc drawing
+  arcSrc: null,
+  // Simulation
+  simStep: 0, playing: false, playTimer: null,
+  // Undo/redo
+  history: [], histIdx: -1,
+  // Counters
+  nc: 0, ac: 0,
+  // Analysis
+  stateSpace: null,
+  // Log
+  log: [],
+  // Context menu target
+  ctxTarget: null,
+};
+
+// ═══════════════════════════════════════════════════════════
+// EXAMPLES
+// ═══════════════════════════════════════════════════════════
+const EXAMPLES = {
+producer:`// Producer-Consumer CPN
+colorset JOBS = {job1, job2, job3}
+colorset WORKERS = {w1, w2}
+
+place Ready    : JOBS    = {job1, job2, job3}
+place Idle     : WORKERS = {w1, w2}
+place Busy     : JOBS*WORKERS = {}
+place Done     : JOBS    = {}
+
+transition Assign   [guard: j in JOBS, w in WORKERS]
+transition Complete [guard: true]
+
+arc Ready    --> Assign   : j
+arc Idle     --> Assign   : w
+arc Assign   --> Busy     : (j,w)
+arc Busy     --> Complete : (j,w)
+arc Complete --> Done     : j
+arc Complete --> Idle     : w`,
+
+philosophers:`// Dining Philosophers
+colorset PHIL = {p1, p2}
+colorset FORK = {f1, f2}
+
+place Thinking : PHIL      = {p1, p2}
+place Eating   : PHIL*FORK = {}
+place Forks    : FORK      = {f1, f2}
+
+transition PickUp  [guard: p in PHIL, f in FORK]
+transition PutDown [guard: true]
+
+arc Thinking --> PickUp  : p
+arc Forks    --> PickUp  : f
+arc PickUp   --> Eating  : (p,f)
+arc Eating   --> PutDown : (p,f)
+arc PutDown  --> Thinking: p
+arc PutDown  --> Forks   : f`,
+
+pipeline:`// Token Pipeline
+colorset DATA = {a, b, c}
+
+place Input   : DATA = {a, b, c}
+place Buffer  : DATA = {}
+place Output  : DATA = {}
+
+transition Push [guard: true]
+transition Pop  [guard: true]
+
+arc Input  --> Push   : x
+arc Push   --> Buffer : x
+arc Buffer --> Pop    : x
+arc Pop    --> Output : x`,
+
+mutex:`// Mutual Exclusion
+colorset PROC = {p1, p2}
+colorset SEM  = {s}
+
+place Ready     : PROC = {p1, p2}
+place Critical  : PROC = {}
+place Done      : PROC = {}
+place Semaphore : SEM  = {s}
+
+transition Enter [guard: p in PROC]
+transition Exit  [guard: true]
+
+arc Ready     --> Enter     : p
+arc Semaphore --> Enter     : s
+arc Enter     --> Critical  : p
+arc Critical  --> Exit      : p
+arc Exit      --> Done      : p
+arc Exit      --> Semaphore : s`,
+};
+
+// ═══════════════════════════════════════════════════════════
+// UNDO / REDO — Command Pattern
+// ═══════════════════════════════════════════════════════════
+function execCmd(cmd) {
+  cmd.do();
+  S.history.splice(S.histIdx + 1);
+  S.history.push(cmd);
+  S.histIdx = S.history.length - 1;
+  render();
+}
+function undo() {
+  if (S.histIdx < 0) return;
+  S.history[S.histIdx].undo();
+  S.histIdx--;
+  render();
+}
+function redo() {
+  if (S.histIdx >= S.history.length - 1) return;
+  S.histIdx++;
+  S.history[S.histIdx].do();
+  render();
+}
+
+const Cmd = {
+  addPlace(x, y) {
+    const id = 'P' + (++S.nc);
+    const node = { id, x, y, label: id, colorSet: 'TOKEN', initTokens: [], tokens: [] };
+    return {
+      do()   { S.places.push(node); S.selected = { type:'place', id }; },
+      undo() { S.places = S.places.filter(p => p.id !== id); S.arcs = S.arcs.filter(a => a.src !== id && a.tgt !== id); if (S.selected?.id === id) S.selected = null; },
+    };
+  },
+  addTransition(x, y) {
+    const id = 'T' + (++S.nc);
+    const node = { id, x, y, label: id, guard: 'true' };
+    return {
+      do()   { S.transitions.push(node); S.selected = { type:'transition', id }; },
+      undo() { S.transitions = S.transitions.filter(t => t.id !== id); S.arcs = S.arcs.filter(a => a.src !== id && a.tgt !== id); if (S.selected?.id === id) S.selected = null; },
+    };
+  },
+  addArc(srcId, tgtId, expr) {
+    const arc = { id: 'arc' + (++S.ac), src: srcId, tgt: tgtId, expr: expr || 'x' };
+    return {
+      do()   { S.arcs.push(arc); },
+      undo() { S.arcs = S.arcs.filter(a => a.id !== arc.id); },
+    };
+  },
+  deleteNode(type, id) {
+    const node = findNode(id);
+    const removedArcs = S.arcs.filter(a => a.src === id || a.tgt === id);
+    return {
+      do() {
+        if (type === 'place') S.places = S.places.filter(p => p.id !== id);
+        else S.transitions = S.transitions.filter(t => t.id !== id);
+        S.arcs = S.arcs.filter(a => a.src !== id && a.tgt !== id);
+        if (S.selected?.id === id) S.selected = null;
+      },
+      undo() {
+        if (type === 'place') S.places.push(node);
+        else S.transitions.push(node);
+        removedArcs.forEach(a => S.arcs.push(a));
+      },
+    };
+  },
+  moveNode(id, fromX, fromY, toX, toY) {
+    const node = findNode(id);
+    return {
+      do()   { node.x = toX; node.y = toY; },
+      undo() { node.x = fromX; node.y = fromY; },
+    };
+  },
+  editProp(id, field, oldVal, newVal) {
+    const node = findNode(id);
+    return {
+      do()   { node[field] = newVal; if (field === 'initTokens') node.tokens = [...newVal]; },
+      undo() { node[field] = oldVal; if (field === 'initTokens') node.tokens = [...oldVal]; },
+    };
+  },
+};
+
+// ═══════════════════════════════════════════════════════════
+// PARSER
+// ═══════════════════════════════════════════════════════════
+function parseCPN(src) {
+  const cs = {}, places = [], transitions = [], arcs = [], errors = [];
+  src.split('\n').forEach((raw, i) => {
+    const line = raw.trim();
+    if (!line || line.startsWith('//') || line.startsWith('#')) return;
+    let m;
+    if ((m = line.match(/^colorset\s+(\w+)\s*=\s*\{([^}]*)\}/))) {
+      cs[m[1]] = m[2].split(',').map(s=>s.trim()).filter(Boolean); return;
+    }
+    if ((m = line.match(/^place\s+(\w+)\s*:\s*([\w*×]+)\s*=\s*\{([^}]*)\}/))) {
+      // Split on commas that are NOT inside parentheses (handles tuple tokens)
+      const toks = (function(str){
+        const out=[]; let cur='', depth=0;
+        for(const ch of str){ if(ch==='(')depth++; else if(ch===')')depth--; if(ch===','&&depth===0){const t=cur.trim();if(t)out.push(t);cur='';}else cur+=ch; }
+        const t=cur.trim(); if(t)out.push(t); return out;
+      })(m[3]);
+      places.push({ id:m[1], label:m[1], colorSet:m[2], initTokens:[...toks], tokens:[...toks] }); return;
+    }
+    if ((m = line.match(/^transition\s+(\w+)(?:\s*\[guard:\s*([^\]]*)\])?/))) {
+      transitions.push({ id:m[1], label:m[1], guard:m[2]?m[2].trim():'true' }); return;
+    }
+    if ((m = line.match(/^arc\s+(\w+)\s*-->\s*(\w+)\s*:\s*(.+)/))) {
+      arcs.push({ src:m[1], tgt:m[2], expr:m[3].trim() }); return;
+    }
+    errors.push(`Line ${i+1}: "${line.slice(0,40)}"`);
+  });
+  return { cs, places, transitions, arcs, errors };
+}
+
+// ═══════════════════════════════════════════════════════════
+// SERIALIZERS
+// ═══════════════════════════════════════════════════════════
+function serializeCPN() {
+  const lines = ['// CPN Tool — Professional Edition'];
+  if (Object.keys(S.colorsets).length) {
+    lines.push('');
+    for (const [n,v] of Object.entries(S.colorsets))
+      lines.push(`colorset ${n} = {${v.join(', ')}}`);
+  }
+  if (S.places.length) {
+    lines.push('');
+    S.places.forEach(p => lines.push(`place ${p.label} : ${p.colorSet||'TOKEN'} = {${p.initTokens.join(', ')}}`));
+  }
+  if (S.transitions.length) {
+    lines.push('');
+    S.transitions.forEach(t => {
+      const g = (t.guard && t.guard!=='true') ? ` [guard: ${t.guard}]` : '';
+      lines.push(`transition ${t.label}${g}`);
+    });
+  }
+  if (S.arcs.length) {
+    lines.push('');
+    S.arcs.forEach(a => {
+      const sn = findNode(a.src), tn = findNode(a.tgt);
+      if (sn && tn) lines.push(`arc ${sn.label} --> ${tn.label} : ${a.expr}`);
+    });
+  }
+  return lines.join('\n');
+}
+
+function serializePNML() {
+  const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  let x = `<?xml version="1.0" encoding="UTF-8"?>\n<pnml xmlns="http://www.pnml.org/version-2009/grammar/pnml">\n<net id="net0" type="http://www.pnml.org/version-2009/grammar/ptnet">\n<name><text>CPN Model</text></name>\n<page id="page0">\n`;
+  S.places.forEach(p => {
+    x += `<place id="${esc(p.id)}"><name><text>${esc(p.label)}</text></name>`;
+    x += `<graphics><position x="${Math.round(p.x)}" y="${Math.round(p.y)}"/></graphics>`;
+    if (p.initTokens.length) x += `<initialMarking><text>${esc(p.initTokens.join(','))}</text></initialMarking>`;
+    x += `<toolspecific tool="cpntool" version="1.0"><colorset>${esc(p.colorSet||'TOKEN')}</colorset></toolspecific>`;
+    x += `</place>\n`;
+  });
+  S.transitions.forEach(t => {
+    x += `<transition id="${esc(t.id)}"><name><text>${esc(t.label)}</text></name>`;
+    x += `<graphics><position x="${Math.round(t.x)}" y="${Math.round(t.y)}"/></graphics>`;
+    if (t.guard && t.guard!=='true') x += `<condition><text>${esc(t.guard)}</text></condition>`;
+    x += `</transition>\n`;
+  });
+  S.arcs.forEach((a,i) => {
+    x += `<arc id="arc${i}" source="${esc(a.src)}" target="${esc(a.tgt)}">`;
+    x += `<inscription><text>${esc(a.expr)}</text></inscription></arc>\n`;
+  });
+  x += `</page></net></pnml>`;
+  return x;
+}
+
+// ═══════════════════════════════════════════════════════════
+// AUTO LAYOUT
+// ═══════════════════════════════════════════════════════════
+function autoLayout() {
+  const W = document.getElementById('canvas-wrap').clientWidth || 800;
+  const H = document.getElementById('canvas-wrap').clientHeight || 500;
+  const all = [
+    ...S.places.map(p=>({...p,k:'place'})),
+    ...S.transitions.map(t=>({...t,k:'transition'})),
+  ];
+  if (!all.length) return;
+  const ind = {}; all.forEach(n=>(ind[n.id]=0));
+  S.arcs.forEach(a=>{ if(ind[a.tgt]!==undefined) ind[a.tgt]++; });
+  const layers = {}, vis = new Set();
+  const roots = all.filter(n=>ind[n.id]===0).map(n=>n.id);
+  roots.forEach(id=>{layers[id]=0; vis.add(id);});
+  const q = [...roots];
+  while(q.length){
+    const cur = q.shift();
+    S.arcs.filter(a=>a.src===cur).forEach(a=>{
+      if(!vis.has(a.tgt)){vis.add(a.tgt);layers[a.tgt]=(layers[cur]||0)+1;q.push(a.tgt);}
+    });
+  }
+  all.forEach(n=>{if(layers[n.id]===undefined)layers[n.id]=0;});
+  const byL = {};
+  all.forEach(n=>{ const l=layers[n.id]; (byL[l]=byL[l]||[]).push(n); });
+  const maxL = Math.max(...Object.keys(byL).map(Number), 0);
+  const PAD = 100, colW = (W-PAD*2)/Math.max(maxL,1);
+  Object.entries(byL).forEach(([l,nodes])=>{
+    const x = PAD + colW*Number(l);
+    const rowH = (H-PAD*2)/nodes.length;
+    nodes.forEach((n,i)=>{
+      const node = findNode(n.id);
+      if(node){ node.x = snapGrid(x); node.y = snapGrid(PAD+rowH*i+rowH/2); }
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// STATE SPACE ENGINE
+// ═══════════════════════════════════════════════════════════
+class StateSpace {
+  constructor() {
+    this.nodes = new Map();
+    this.nodeList = [];
+    this.edges = [];
+    this.truncated = false;
+  }
+  markingKey(m) {
+    return JSON.stringify(Object.fromEntries(
+      Object.entries(m).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>[k,[...v].sort()])
+    ));
+  }
+  cloneM(m) { const r={}; for(const[k,v]of Object.entries(m))r[k]=[...v]; return r; }
+
+  _tryBind(inArcs, idx, binding, marking) {
+    if (idx === inArcs.length) return binding;
+    const arc = inArcs[idx];
+    const tokens = marking[arc.src] || [];
+    const expr = arc.expr.trim();
+    if (/^\w+$/.test(expr)) {
+      for (const tok of tokens) {
+        const nb = {...binding, [expr]:tok};
+        const res = this._tryBind(inArcs, idx+1, nb, marking);
+        if (res!==null) return res;
+      }
+      return null;
+    }
+    const tm = expr.match(/^\((\w+),(\w+)\)$/);
+    if (tm) {
+      for (const tok of tokens) {
+        const parts = tok.replace(/[()]/g,'').split(',').map(s=>s.trim());
+        if (parts.length===2) {
+          const nb = {...binding,[tm[1]]:parts[0],[tm[2]]:parts[1]};
+          const res = this._tryBind(inArcs,idx+1,nb,marking);
+          if(res!==null)return res;
+        }
+      }
+      return null;
+    }
+    if (tokens.includes(expr)) return this._tryBind(inArcs,idx+1,binding,marking);
+    return null;
+  }
+  _resolve(expr, binding) {
+    const t=expr.trim();
+    if(binding[t]!==undefined)return binding[t];
+    const tm=t.match(/^\((\w+),(\w+)\)$/);
+    if(tm)return `(${binding[tm[1]]||tm[1]},${binding[tm[2]]||tm[2]})`;
+    return t;
+  }
+  getEnabled(marking) {
+    const res=[];
+    for(const t of S.transitions){
+      const inArcs=S.arcs.filter(a=>a.tgt===t.id);
+      if(!inArcs.length)continue;
+      const b=this._tryBind(inArcs,0,{},marking);
+      if(b!==null)res.push({t,binding:b});
+    }
+    return res;
+  }
+  fire(marking, item) {
+    const m=this.cloneM(marking);
+    S.arcs.filter(a=>a.tgt===item.t.id).forEach(arc=>{
+      const tok=this._resolve(arc.expr,item.binding);
+      const i=m[arc.src].indexOf(tok);
+      if(i!==-1)m[arc.src].splice(i,1);
+    });
+    S.arcs.filter(a=>a.src===item.t.id).forEach(arc=>{
+      const tok=this._resolve(arc.expr,item.binding);
+      if(m[arc.tgt]!==undefined)m[arc.tgt].push(tok);
+    });
+    return m;
+  }
+  explore(initMarking, maxStates=1000) {
+    const t0=Date.now();
+    const init=this.cloneM(initMarking);
+    const initKey=this.markingKey(init);
+    const initNode={id:0,key:initKey,marking:init,isDeadlock:false};
+    this.nodes.set(initKey,initNode);
+    this.nodeList.push(initNode);
+    const queue=[initNode]; let nid=1;
+    while(queue.length){
+      if(this.nodeList.length>=maxStates){this.truncated=true;break;}
+      const node=queue.shift();
+      const enabled=this.getEnabled(node.marking);
+      if(!enabled.length){node.isDeadlock=true;continue;}
+      for(const item of enabled){
+        const nm=this.fire(node.marking,item);
+        const key=this.markingKey(nm);
+        let tgt=this.nodes.get(key);
+        if(!tgt){tgt={id:nid++,key,marking:nm,isDeadlock:false};this.nodes.set(key,tgt);this.nodeList.push(tgt);queue.push(tgt);}
+        const bstr=Object.entries(item.binding).map(([k,v])=>`${k}=${v}`).join(',');
+        this.edges.push({from:node.id,to:tgt.id,transId:item.t.id,transLabel:item.t.label,binding:bstr});
+      }
+    }
+    return {nodeCount:this.nodeList.length,edgeCount:this.edges.length,
+            deadlocks:this.nodeList.filter(n=>n.isDeadlock),
+            truncated:this.truncated,timeMs:Date.now()-t0};
+  }
+  boundedness() {
+    const max={};S.places.forEach(p=>{max[p.id]=0;});
+    for(const node of this.nodeList)
+      for(const[pid,toks]of Object.entries(node.marking))
+        if(toks.length>(max[pid]||0))max[pid]=toks.length;
+    return max;
+  }
+  liveness() {
+    const fires=new Set(this.edges.map(e=>e.transId));
+    const r={};S.transitions.forEach(t=>{r[t.id]=fires.has(t.id);});
+    return r;
+  }
+  isReachable(targetM) {
+    const key=this.markingKey(targetM);
+    if(!this.nodes.has(key))return{reachable:false,path:null};
+    const initKey=this.nodeList[0]?.key;
+    if(!initKey||initKey===key)return{reachable:true,path:[]};
+    const visited=new Map([[initKey,null]]);
+    const q=[initKey];
+    while(q.length){
+      const cur=q.shift();
+      if(cur===key){
+        const path=[];let k=cur;
+        while(visited.get(k)!==null){const e=visited.get(k);path.unshift(e);k=this.nodeList[e.from].key;}
+        return{reachable:true,path};
+      }
+      const cNode=this.nodes.get(cur);
+      this.edges.filter(e=>e.from===cNode.id).forEach(e=>{
+        const nk=this.nodeList[e.to]?.key;
+        if(nk&&!visited.has(nk)){visited.set(nk,e);q.push(nk);}
+      });
+    }
+    return{reachable:false,path:null};
+  }
+  sccCount() {
+    const n=this.nodeList.length;
+    const adj=Array.from({length:n},()=>[]);
+    this.edges.forEach(e=>adj[e.from].push(e.to));
+    let idx=0,count=0;
+    const indices=new Array(n).fill(-1),low=new Array(n).fill(0),onStk=new Array(n).fill(false),stk=[];
+    const sc=(v)=>{
+      indices[v]=low[v]=idx++;stk.push(v);onStk[v]=true;
+      for(const w of(adj[v]||[])){
+        if(indices[w]===-1){sc(w);low[v]=Math.min(low[v],low[w]);}
+        else if(onStk[w])low[v]=Math.min(low[v],indices[w]);
+      }
+      if(low[v]===indices[v]){let w;do{w=stk.pop();onStk[w]=false;}while(w!==v);count++;}
+    };
+    for(let v=0;v<n;v++)if(indices[v]===-1)sc(v);
+    return count;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// SIMULATION ENGINE
+// ═══════════════════════════════════════════════════════════
+function getEnabled() {
+  const ss=new StateSpace();
+  const m={};S.places.forEach(p=>{m[p.id]=[...p.tokens];});
+  return ss.getEnabled(m);
+}
+function fireItem(item) {
+  const {t,binding}=item;
+  S.arcs.filter(a=>a.tgt===t.id).forEach(arc=>{
+    const place=S.places.find(p=>p.id===arc.src);
+    const tok=resolveExpr(arc.expr,binding);
+    const i=place.tokens.indexOf(tok);
+    if(i!==-1)place.tokens.splice(i,1);
+  });
+  S.arcs.filter(a=>a.src===t.id).forEach(arc=>{
+    const place=S.places.find(p=>p.id===arc.tgt);
+    if(place)place.tokens.push(resolveExpr(arc.expr,binding));
+  });
+  S.simStep++;
+  const bs=Object.entries(binding).map(([k,v])=>`${k}↦${v}`).join(' ');
+  log(`Fired: ${t.label}${bs?' ['+bs+']':''}`, 'fire');
+  render();
+}
+function resolveExpr(expr,binding) {
+  const t=expr.trim();
+  if(binding[t]!==undefined)return binding[t];
+  const tm=t.match(/^\((\w+),(\w+)\)$/);
+  if(tm)return`(${binding[tm[1]]||tm[1]},${binding[tm[2]]||tm[2]})`;
+  return t;
+}
+function simStep() {
+  const en=getEnabled();
+  if(!en.length){stopPlay();document.getElementById('deadlock-badge').style.display='block';log('Deadlock — no enabled transitions','warn');return;}
+  document.getElementById('deadlock-badge').style.display='none';
+  const item=en[Math.floor(Math.random()*en.length)];
+  // Flash
+  const tEl=document.querySelector(`[data-id="${item.t.id}"] .trans-body`);
+  if(tEl){tEl.classList.add('fir');setTimeout(()=>tEl.classList.remove('fir'),260);}
+  setTimeout(()=>fireItem(item),120);
+}
+function simReset() {
+  stopPlay();S.simStep=0;
+  S.places.forEach(p=>{p.tokens=[...p.initTokens];});
+  document.getElementById('deadlock-badge').style.display='none';
+  log('Simulation reset','system');render();
+}
+function startPlay(){S.playing=true;document.getElementById('btn-play').textContent='⏸ Pause';S.playTimer=setInterval(()=>{const en=getEnabled();if(!en.length){stopPlay();return;}simStep();},600);}
+function stopPlay(){S.playing=false;clearInterval(S.playTimer);document.getElementById('btn-play').textContent='⏵ Play';}
+
+// ═══════════════════════════════════════════════════════════
+// ANALYSIS
+// ═══════════════════════════════════════════════════════════
+function runAnalysis() {
+  const btn=document.getElementById('analyse-btn');
+  btn.classList.add('running'); btn.textContent='⊞ Running…';
+  // Switch to analysis tab
+  switchRightTab('analysis');
+  setTimeout(()=>{
+    const initM={};S.places.forEach(p=>{initM[p.id]=[...p.initTokens];});
+    const ss=new StateSpace();
+    const stats=ss.explore(initM,1000);
+    S.stateSpace=ss;
+    displayAnalysis(ss,stats);
+    btn.classList.remove('running');btn.textContent='⊞ Analyse';
+    log(`Analysis: ${stats.nodeCount} states, ${stats.edgeCount} arcs${stats.truncated?' (truncated)':''}`, 'system');
+  },10);
+}
+
+function displayAnalysis(ss,stats) {
+  document.getElementById('no-analysis').style.display='none';
+  document.getElementById('analysis-results').style.display='';
+
+  // Stats
+  const scc=ss.sccCount();
+  document.getElementById('ss-stats').innerHTML=`
+    <div class="analysis-stat"><span class="analysis-key">States</span><span class="analysis-val">${stats.nodeCount}${stats.truncated?' <span style="color:var(--amber)">(cap)</span>':''}</span></div>
+    <div class="analysis-stat"><span class="analysis-key">Arcs</span><span class="analysis-val">${stats.edgeCount}</span></div>
+    <div class="analysis-stat"><span class="analysis-key">Dead markings</span><span class="analysis-val ${stats.deadlocks.length?'warn':'good'}">${stats.deadlocks.length}</span></div>
+    <div class="analysis-stat"><span class="analysis-key">SCCs</span><span class="analysis-val">${scc}</span></div>
+    <div class="analysis-stat"><span class="analysis-key">Analysis time</span><span class="analysis-val">${stats.timeMs}ms</span></div>
+    <div class="analysis-stat"><span class="analysis-key">Strongly connected</span><span class="analysis-val ${scc===1?'good':'warn'}">${scc===1?'Yes':'No ('+scc+' SCCs)'}</span></div>
+  `;
+
+  // Boundedness
+  const bounds=ss.boundedness();
+  document.getElementById('ss-bounds').innerHTML=S.places.map(p=>{
+    const max=bounds[p.id]||0;
+    return`<div class="analysis-stat">
+      <span class="analysis-key">${p.label}</span>
+      <span><span class="analysis-badge badge-bounded">≤${max}</span></span>
+    </div>`;
+  }).join('');
+
+  // Liveness
+  const live=ss.liveness();
+  document.getElementById('ss-live').innerHTML=S.transitions.map(t=>{
+    const isLive=live[t.id];
+    return`<div class="analysis-stat">
+      <span class="analysis-key">${t.label}</span>
+      <span class="analysis-badge ${isLive?'badge-live':'badge-dead'}">${isLive?'LIVE':'DEAD'}</span>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════
+// CANVAS RENDERING
+// ═══════════════════════════════════════════════════════════
+function svgEl(tag,attrs={}) {
+  const e=document.createElementNS(SVG_NS,tag);
+  for(const[k,v]of Object.entries(attrs))e.setAttribute(k,v);
+  return e;
+}
+function svgTxt(tag,attrs,text) { const e=svgEl(tag,attrs); e.textContent=text; return e; }
+
+function findNode(id) { return S.places.find(p=>p.id===id)||S.transitions.find(t=>t.id===id); }
+function nodeKind(id) { return S.places.find(p=>p.id===id)?'place':S.transitions.find(t=>t.id===id)?'transition':null; }
+function snapGrid(v) { return S.snap ? Math.round(v/GRID)*GRID : v; }
+
+function getEdgePt(id, tx, ty) {
+  const n=findNode(id);if(!n)return{x:0,y:0};
+  const dx=tx-n.x,dy=ty-n.y,len=Math.sqrt(dx*dx+dy*dy)||1;
+  const ux=dx/len,uy=dy/len;
+  if(nodeKind(id)==='place')return{x:n.x+ux*PLACE_R,y:n.y+uy*PLACE_R};
+  const hw=TW/2,hh=TH/2;
+  const s=Math.min(hw/Math.abs(ux||.001),hh/Math.abs(uy||.001));
+  return{x:n.x+ux*s,y:n.y+uy*s};
+}
+
+function render() {
+  if(S.mode!=='visual') return;
+  const enabled=getEnabled();
+  const enTids=new Set(enabled.map(e=>e.t.id));
+  const enPids=new Set();
+  enabled.forEach(e=>{
+    S.arcs.filter(a=>a.tgt===e.t.id).forEach(a=>enPids.add(a.src));
+    S.arcs.filter(a=>a.src===e.t.id).forEach(a=>enPids.add(a.tgt));
+  });
+
+  renderArcs(enTids);
+  renderNodes(enTids,enPids);
+  updateEnabledPanel(enabled);
+  updateMarkingPanel();
+  updatePropsPanel();
+  updateStatusBar();
+}
+
+function renderArcs(enTids) {
+  const layer=document.getElementById('cv-arcs');
+  layer.innerHTML='';
+
+  // Build set of reverse arc pairs to decide straight vs curved
+  const arcPairs=new Set(S.arcs.map(a=>a.src+'>'+a.tgt));
+  const ARROW_OFFSET=10; // px beyond node surface for arrowhead
+
+  S.arcs.forEach((arc,i)=>{
+    const sn=findNode(arc.src), tn=findNode(arc.tgt);
+    if(!sn||!tn)return;
+    const isEn=enTids.has(arc.src)||enTids.has(arc.tgt);
+    const hasReverse=arcPairs.has(arc.tgt+'>'+arc.src);
+
+    // p1 = exit point on source surface, facing target
+    // p2 = point on target surface facing source (arrowhead lands here)
+    const p1=getEdgePt(arc.src, tn.x, tn.y);
+    const p2=getEdgePt(arc.tgt, sn.x, sn.y);
+
+    // Control point: curve if parallel arc exists, else gentle straight
+    const CURVE=hasReverse?0.22:0.06;
+    const dx=p2.x-p1.x, dy=p2.y-p1.y;
+    const cx=(p1.x+p2.x)/2 - dy*CURVE;
+    const cy=(p1.y+p2.y)/2 + dx*CURVE;
+
+    // True midpoint on quadratic bezier at t=0.5
+    const mx=0.25*p1.x+0.5*cx+0.25*p2.x;
+    const my=0.25*p1.y+0.5*cy+0.25*p2.y;
+
+    // SVG path with proper spaces
+    const d=`M ${p1.x.toFixed(2)},${p1.y.toFixed(2)} Q ${cx.toFixed(2)},${cy.toFixed(2)} ${p2.x.toFixed(2)},${p2.y.toFixed(2)}`;
+
+    const g=svgEl('g',{'data-arc':arc.id});
+    if(isEn)g.appendChild(svgEl('path',{d,class:'arc-glow'}));
+    g.appendChild(svgEl('path',{d,
+      class:'arc-path'+(isEn?' en':''),
+      'marker-end':isEn?'url(#arr-en)':'url(#arr)'
+    }));
+
+    // Label — wide enough for tuple expressions like "(j,w)"
+    const expr=arc.expr;
+    const lblW=Math.max(44, expr.length*7+16);
+    const lbg=svgEl('rect',{
+      x:mx-lblW/2, y:my-9, width:lblW, height:17, rx:3,
+      class:'arc-lbl-bg',
+      stroke:isEn?'#2563eb':'#0e2540','stroke-width':'0.8'
+    });
+    const lt=svgTxt('text',{
+      x:mx, y:my+5, 'text-anchor':'middle',
+      class:'arc-lbl-txt', fill:isEn?'#7dd3fc':'#2a5580'
+    }, expr);
+    g.appendChild(lbg); g.appendChild(lt);
+
+    // Hit area for double-click edit
+    const hit=svgEl('path',{d,stroke:'transparent','stroke-width':'14',fill:'none',style:'cursor:pointer'});
+    hit.addEventListener('dblclick',ev=>{ev.stopPropagation();openArcModal(arc);});
+    hit.addEventListener('contextmenu',ev=>{ev.preventDefault();ev.stopPropagation();});
+    g.appendChild(hit);
+    layer.appendChild(g);
+  });
+}
+
+function renderNodes(enTids,enPids) {
+  const layer=document.getElementById('cv-nodes');
+  layer.innerHTML='';
+  S.places.forEach(p=>layer.appendChild(buildPlace(p,enPids)));
+  S.transitions.forEach(t=>layer.appendChild(buildTrans(t,enTids)));
+}
+
+function buildPlace(p,enPids) {
+  const isSel=S.selected?.id===p.id;
+  const isEn=enPids.has(p.id);
+  const toks=p.tokens;
+  const g=svgEl('g',{'data-id':p.id,transform:`translate(${p.x},${p.y})`});
+  // Glow
+  if(isEn)g.appendChild(svgEl('circle',{cx:0,cy:0,r:PLACE_R+14,fill:'#3b82f615',class:'place-outer'}));
+  g.appendChild(svgEl('circle',{cx:0,cy:0,r:PLACE_R,class:'place-body'+(isSel?' sel':isEn?' en':'')}));
+  g.appendChild(svgEl('circle',{cx:0,cy:0,r:PLACE_R-9,class:'place-ring'}));
+  // Text
+  g.appendChild(svgTxt('text',{x:0,y:toks.length>0?-12:-4,'text-anchor':'middle',class:'place-lbl'},p.label));
+  g.appendChild(svgTxt('text',{x:0,y:5,'text-anchor':'middle',class:'place-cs'},`\u3008${p.colorSet||'?'}\u3009`));
+  // Tokens
+  if(!toks.length) {
+    g.appendChild(svgTxt('text',{x:0,y:PLACE_R-10,'text-anchor':'middle',class:'empty-mark'},'∅'));
+  } else {
+    const show=toks.slice(0,4),extra=toks.length-show.length;
+    show.forEach((tok,i)=>{
+      const tx=(i-(show.length-1)/2)*17, ty=PLACE_R-14;
+      const dg=svgEl('g');
+      dg.appendChild(svgEl('circle',{cx:tx,cy:ty,r:7,class:'tok-dot'}));
+      dg.appendChild(svgTxt('text',{x:tx,y:ty+3.5,'text-anchor':'middle',class:'tok-lbl'},tok.length>3?tok.slice(0,3):tok));
+      const title=svgEl('title');title.textContent=tok;dg.appendChild(title);
+      g.appendChild(dg);
+    });
+    if(extra>0)g.appendChild(svgTxt('text',{x:show.length*9+4,y:PLACE_R-10,'font-size':'8',fill:'#f59e0b'},`+${extra}`));
+  }
+  attachNodeEvents(g,'place',p.id);
+  return g;
+}
+
+function buildTrans(t,enTids) {
+  const isSel=S.selected?.id===t.id;
+  const isEn=enTids.has(t.id);
+  const g=svgEl('g',{'data-id':t.id,transform:`translate(${t.x},${t.y})`});
+  if(isEn)g.appendChild(svgEl('rect',{x:-TW/2-8,y:-TH/2-8,width:TW+16,height:TH+16,rx:6,fill:'#16a34a15'}));
+  g.appendChild(svgEl('rect',{x:-TW/2,y:-TH/2,width:TW,height:TH,rx:4,class:'trans-body'+(isSel?' sel':isEn?' en':'')}));
+  g.appendChild(svgTxt('text',{x:0,y:t.guard&&t.guard!=='true'?-4:4,'text-anchor':'middle',class:'trans-lbl'},t.label));
+  if(t.guard&&t.guard!=='true'){
+    const gs=t.guard.length>18?t.guard.slice(0,16)+'…':t.guard;
+    g.appendChild(svgTxt('text',{x:0,y:11,'text-anchor':'middle',class:'trans-guard'},`[${gs}]`));
+  }
+  attachNodeEvents(g,'transition',t.id);
+  return g;
+}
+
+// ═══════════════════════════════════════════════════════════
+// NODE INTERACTION
+// ═══════════════════════════════════════════════════════════
+let drag=null;
+
+function attachNodeEvents(g,kind,id) {
+  g.addEventListener('mousedown',ev=>{
+    ev.stopPropagation();
+    if(ev.button===2){openCtxMenu(ev,kind,id);return;}
+
+    if(S.tool==='delete'){execCmd(Cmd.deleteNode(kind,id));return;}
+    if(S.tool==='arc'){
+      if(!S.arcSrc){S.arcSrc={kind,id};g.style.opacity='0.5';}
+      else{
+        if(S.arcSrc.id!==id){
+          const cmd=Cmd.addArc(S.arcSrc.id,id,'x');
+          execCmd(cmd);
+          const arc=S.arcs[S.arcs.length-1];
+          openArcModal(arc);
+        }
+        clearArcDraw();
+      }
+      return;
+    }
+    // Select + drag
+    S.selected={type:kind,id};
+    const node=findNode(id);
+    drag={id,kind,ox:ev.clientX,oy:ev.clientY,nx:node.x,ny:node.y,moved:false};
+    document.addEventListener('mousemove',onDragMove,{passive:true});
+    document.addEventListener('mouseup',onDragEnd,{once:true});
+    render();
+  });
+  g.addEventListener('dblclick',ev=>{
+    ev.stopPropagation();
+    if(kind==='transition'){
+      const en=getEnabled();
+      const item=en.find(e=>e.t.id===id);
+      if(item){fireItem(item);return;}
+    }
+    S.selected={type:kind,id};render();
+  });
+  g.addEventListener('contextmenu',ev=>{ev.preventDefault();openCtxMenu(ev,kind,id);});
+}
+
+function svgPoint(ev) {
+  const svg=document.getElementById('cpn-svg');
+  const pt=svg.createSVGPoint();
+  pt.x=ev.clientX;pt.y=ev.clientY;
+  return pt.matrixTransform(svg.getScreenCTM().inverse());
+}
+
+function onDragMove(ev) {
+  if(!drag)return;
+  const node=findNode(drag.id);if(!node)return;
+  const sp=svgPoint(ev);
+  const rawX=drag.nx+(sp.x-svgPoint({clientX:drag.ox,clientY:drag.oy}).x);
+  const rawY=drag.ny+(sp.y-svgPoint({clientX:drag.ox,clientY:drag.oy}).y);
+  node.x=snapGrid(rawX);node.y=snapGrid(rawY);
+  drag.moved=true;
+  render();
+}
+
+function onDragEnd(ev) {
+  if(drag&&drag.moved){
+    const node=findNode(drag.id);
+    // Push move to history
+    const cmd=Cmd.moveNode(drag.id,drag.nx,drag.ny,node.x,node.y);
+    // Don't re-execute (already done), just push to history
+    S.history.splice(S.histIdx+1);
+    S.history.push({do:()=>{node.x=node.x;node.y=node.y;},undo:()=>{node.x=drag.nx;node.y=drag.ny;}});
+    S.histIdx=S.history.length-1;
+  }
+  drag=null;
+  document.removeEventListener('mousemove',onDragMove);
+}
+
+// ═══════════════════════════════════════════════════════════
+// PAN + ZOOM
+// ═══════════════════════════════════════════════════════════
+let panning=false,panStart={x:0,y:0},panOrigin={tx:0,ty:0};
+
+function applyTransform() {
+  document.getElementById('cv-root').setAttribute('transform',`translate(${S.tx},${S.ty}) scale(${S.scale})`);
+  document.getElementById('sb-zoom').textContent=Math.round(S.scale*100)+'%';
+}
+
+function zoomAt(cx,cy,factor) {
+  const newScale=Math.min(4,Math.max(0.15,S.scale*factor));
+  const f=newScale/S.scale;
+  S.tx=cx-(cx-S.tx)*f;
+  S.ty=cy-(cy-S.ty)*f;
+  S.scale=newScale;
+  applyTransform();
+}
+
+function fitToScreen() {
+  if(!S.places.length&&!S.transitions.length)return;
+  const all=[...S.places,...S.transitions];
+  const W=document.getElementById('canvas-wrap').clientWidth;
+  const H=document.getElementById('canvas-wrap').clientHeight;
+  const pad=80;
+  const minX=Math.min(...all.map(n=>n.x))-PLACE_R;
+  const maxX=Math.max(...all.map(n=>n.x))+PLACE_R;
+  const minY=Math.min(...all.map(n=>n.y))-PLACE_R;
+  const maxY=Math.max(...all.map(n=>n.y))+PLACE_R;
+  const scaleX=(W-pad*2)/(maxX-minX||1);
+  const scaleY=(H-pad*2)/(maxY-minY||1);
+  S.scale=Math.min(1.5,Math.min(scaleX,scaleY));
+  S.tx=W/2-((minX+maxX)/2)*S.scale;
+  S.ty=H/2-((minY+maxY)/2)*S.scale;
+  applyTransform();
+}
+
+const cvWrap=document.getElementById('canvas-wrap');
+cvWrap.addEventListener('wheel',ev=>{
+  ev.preventDefault();
+  const rect=cvWrap.getBoundingClientRect();
+  const cx=ev.clientX-rect.left,cy=ev.clientY-rect.top;
+  zoomAt(cx,cy,ev.deltaY<0?1.1:0.91);
+},{passive:false});
+
+cvWrap.addEventListener('mousedown',ev=>{
+  if(ev.button===1||(ev.button===0&&ev.altKey)){
+    panning=true;panStart={x:ev.clientX,y:ev.clientY};panOrigin={tx:S.tx,ty:S.ty};
+    document.getElementById('cpn-svg').classList.add('panning');
+    ev.preventDefault();
+  }
+});
+document.addEventListener('mousemove',ev=>{
+  if(!panning)return;
+  S.tx=panOrigin.tx+(ev.clientX-panStart.x);
+  S.ty=panOrigin.ty+(ev.clientY-panStart.y);
+  applyTransform();
+});
+document.addEventListener('mouseup',ev=>{
+  if(panning){panning=false;document.getElementById('cpn-svg').classList.remove('panning');}
+});
+
+// Canvas click
+document.getElementById('cpn-svg').addEventListener('click',ev=>{
+  if(drag?.moved)return;
+  const sp=svgPoint(ev);
+  const x=snapGrid((sp.x-0)/1), y=snapGrid((sp.y-0)/1);
+  if(S.tool==='place'){execCmd(Cmd.addPlace(x,y));return;}
+  if(S.tool==='transition'){execCmd(Cmd.addTransition(x,y));return;}
+  if(S.tool==='arc'){clearArcDraw();return;}
+  S.selected=null;render();
+});
+
+// Mouse move for arc preview + cursor coords
+document.getElementById('cpn-svg').addEventListener('mousemove',ev=>{
+  const sp=svgPoint(ev);
+  document.getElementById('sb-cursor').textContent=`x:${Math.round(sp.x)} y:${Math.round(sp.y)}`;
+  if(!S.arcSrc)return;
+  const prev=document.getElementById('cv-preview');
+  prev.innerHTML='';
+  const src=findNode(S.arcSrc.id);if(!src)return;
+  const ep=getEdgePt(S.arcSrc.id,sp.x,sp.y);
+  const d2=`M ${ep.x.toFixed(1)},${ep.y.toFixed(1)} L ${sp.x.toFixed(1)},${sp.y.toFixed(1)}`;
+  prev.appendChild(svgEl('path',{d:d2,class:'arc-preview','marker-end':'url(#arr-pr)'}));
+});
+
+function clearArcDraw() {
+  S.arcSrc=null;
+  document.getElementById('cv-preview').innerHTML='';
+  document.querySelectorAll('[data-id]').forEach(g=>g.style.opacity='');
+}
+
+// Context menu
+function openCtxMenu(ev,kind,id) {
+  S.ctxTarget={kind,id};S.selected={type:kind,id};render();
+  const m=document.getElementById('ctx-menu');
+  const fireEl=document.getElementById('ctx-fire');
+  fireEl.style.display=kind==='transition'?'':'none';
+  m.style.display='block';m.style.left=ev.clientX+'px';m.style.top=ev.clientY+'px';
+}
+document.getElementById('ctx-fire').addEventListener('click',()=>{
+  if(!S.ctxTarget)return;
+  const en=getEnabled();const item=en.find(e=>e.t.id===S.ctxTarget.id);
+  if(item)fireItem(item);else log('Transition not enabled','warn');
+  closeCtxMenu();
+});
+document.getElementById('ctx-edit').addEventListener('click',()=>{
+  if(S.ctxTarget){S.selected=S.ctxTarget;updatePropsPanel();}
+  closeCtxMenu();
+});
+document.getElementById('ctx-del').addEventListener('click',()=>{
+  if(S.ctxTarget)execCmd(Cmd.deleteNode(S.ctxTarget.kind,S.ctxTarget.id));
+  closeCtxMenu();
+});
+function closeCtxMenu(){document.getElementById('ctx-menu').style.display='none';}
+document.addEventListener('click',()=>closeCtxMenu());
+
+// ═══════════════════════════════════════════════════════════
+// PROPERTIES PANEL
+// ═══════════════════════════════════════════════════════════
+function updatePropsPanel() {
+  if(!S.selected){
+    document.getElementById('props-form').style.display='none';
+    document.getElementById('no-sel').style.display='';return;
+  }
+  document.getElementById('props-form').style.display='';
+  document.getElementById('no-sel').style.display='none';
+  const node=findNode(S.selected.id);if(!node)return;
+  const isP=S.selected.type==='place';
+  document.getElementById('p-name').value=node.label;
+  document.getElementById('pg-cs').style.display=isP?'':'none';
+  document.getElementById('pg-init').style.display=isP?'':'none';
+  document.getElementById('pg-toks').style.display=isP?'':'none';
+  document.getElementById('pg-guard').style.display=isP?'none':'';
+  if(isP){
+    document.getElementById('p-cs').value=node.colorSet||'';
+    document.getElementById('p-init').value=(node.initTokens||[]).join(', ');
+    document.getElementById('p-toks').textContent=node.tokens.length?node.tokens.join(', '):'∅';
+  } else {
+    document.getElementById('p-guard').value=node.guard||'true';
+  }
+}
+
+document.getElementById('p-name').addEventListener('change',ev=>{
+  if(!S.selected)return;
+  const node=findNode(S.selected.id);
+  execCmd(Cmd.editProp(S.selected.id,'label',node.label,ev.target.value));
+});
+document.getElementById('p-cs').addEventListener('change',ev=>{
+  if(!S.selected)return;
+  const node=findNode(S.selected.id);
+  execCmd(Cmd.editProp(S.selected.id,'colorSet',node.colorSet,ev.target.value));
+});
+document.getElementById('p-init').addEventListener('change',ev=>{
+  if(!S.selected)return;
+  const node=findNode(S.selected.id);
+  const newToks=ev.target.value.split(',').map(s=>s.trim()).filter(Boolean);
+  execCmd(Cmd.editProp(S.selected.id,'initTokens',node.initTokens,newToks));
+  render();
+});
+document.getElementById('p-guard').addEventListener('change',ev=>{
+  if(!S.selected)return;
+  const node=findNode(S.selected.id);
+  execCmd(Cmd.editProp(S.selected.id,'guard',node.guard,ev.target.value));
+});
+document.getElementById('snap-chk').addEventListener('change',ev=>{
+  S.snap=ev.target.checked;
+  document.getElementById('sb-snap').querySelector('.sb-val').textContent=S.snap?'ON':'OFF';
+});
+
+// ═══════════════════════════════════════════════════════════
+// ARC MODAL
+// ═══════════════════════════════════════════════════════════
+let editingArc=null;
+function openArcModal(arc) {
+  editingArc=arc;
+  document.getElementById('m-arc-expr').value=arc.expr;
+  document.getElementById('arc-modal').style.display='';
+  document.getElementById('help-modal').style.display='none';
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('m-arc-expr').focus();
+}
+document.getElementById('m-ok').addEventListener('click',()=>{
+  if(editingArc)editingArc.expr=document.getElementById('m-arc-expr').value.trim()||'x';
+  document.getElementById('overlay').classList.remove('open');
+  editingArc=null;render();
+});
+document.getElementById('m-cancel').addEventListener('click',()=>{
+  document.getElementById('overlay').classList.remove('open');editingArc=null;
+});
+document.getElementById('m-arc-expr').addEventListener('keydown',ev=>{
+  if(ev.key==='Enter')document.getElementById('m-ok').click();
+  if(ev.key==='Escape')document.getElementById('m-cancel').click();
+});
+
+// Help modal
+document.getElementById('btn-help').addEventListener('click',()=>{
+  document.getElementById('arc-modal').style.display='none';
+  document.getElementById('help-modal').style.display='';
+  document.getElementById('overlay').classList.add('open');
+});
+document.getElementById('help-close').addEventListener('click',()=>{
+  document.getElementById('overlay').classList.remove('open');
+});
+document.getElementById('overlay').addEventListener('click',ev=>{
+  if(ev.target===document.getElementById('overlay'))document.getElementById('overlay').classList.remove('open');
+});
+
+// ═══════════════════════════════════════════════════════════
+// MARKING + ENABLED PANELS
+// ═══════════════════════════════════════════════════════════
+function updateMarkingPanel() {
+  const el=document.getElementById('marking-panel');
+  if(!S.places.length){el.innerHTML='<div style="font-size:9px;color:var(--text3);padding:6px 10px">No places</div>';return;}
+  el.innerHTML=S.places.map(p=>`
+    <div class="mark-row">
+      <span class="mark-name">${p.label}</span>
+      <span class="mark-val">${p.tokens.length}</span>
+    </div>`).join('');
+}
+function updateEnabledPanel(enabled) {
+  const list=document.getElementById('enabled-list');
+  if(!enabled.length){list.innerHTML='<div style="font-size:9px;color:var(--text3)">None enabled</div>';return;}
+  list.innerHTML=enabled.map((item,i)=>{
+    const bs=Object.entries(item.binding).map(([k,v])=>`${k}↦${v}`).join(' ');
+    return`<button class="en-btn" data-i="${i}">${item.t.label}${bs?`<span class="en-bind">[${bs}]</span>`:''}</button>`;
+  }).join('');
+  list.querySelectorAll('.en-btn').forEach(btn=>btn.addEventListener('click',()=>fireItem(enabled[+btn.dataset.i])));
+}
+function updateStatusBar() {
+  document.getElementById('sb-p').textContent=S.places.length;
+  document.getElementById('sb-t').textContent=S.transitions.length;
+  document.getElementById('sb-a').textContent=S.arcs.length;
+  document.getElementById('sb-tok').textContent=S.places.reduce((s,p)=>s+p.tokens.length,0);
+  document.getElementById('step-num').textContent=S.simStep;
+}
+
+// ═══════════════════════════════════════════════════════════
+// LOG
+// ═══════════════════════════════════════════════════════════
+function log(msg,kind='system') {
+  S.log.push({msg,kind});
+  const c=document.getElementById('log-pane');
+  const d=document.createElement('div');
+  d.className=`log-entry ${kind}`;
+  d.innerHTML=`<span class="log-num">#${String(S.log.length).padStart(3,'0')}</span>${msg}`;
+  c.appendChild(d);c.scrollTop=c.scrollHeight;
+}
+
+// ═══════════════════════════════════════════════════════════
+// TEXT EDITOR — SYNTAX HIGHLIGHTING
+// ═══════════════════════════════════════════════════════════
+function hlLine(line) {
+  if(!line.trim())return'<br>';
+  const e=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  if(line.trim().startsWith('//')||line.trim().startsWith('#'))return`<span class="hl-cm">${e(line)}</span>`;
+  let m;
+  m=line.match(/^(\s*)(colorset)(\s+)(\w+)(\s*=\s*)(\{)([^}]*)(\})(.*)/);
+  if(m){const toks=m[7].split(',').map(t=>`<span class="hl-tk">${e(t.trim())}</span>`).join('<span class="hl-pt">, </span>');return`${e(m[1])}<span class="hl-kw">${m[2]}</span>${e(m[3])}<span class="hl-nm">${m[4]}</span><span class="hl-pt">${e(m[5])}{</span>${toks}<span class="hl-pt">}</span>${e(m[9])}`;}
+  m=line.match(/^(\s*)(place)(\s+)(\w+)(\s*:\s*)([\w*×]+)(\s*=\s*)(\{)([^}]*)(\})(.*)/);
+  if(m){const toks=m[9].split(',').map(t=>`<span class="hl-tk">${e(t.trim())}</span>`).join('<span class="hl-pt">, </span>');return`${e(m[1])}<span class="hl-kw">${m[2]}</span>${e(m[3])}<span class="hl-nm">${m[4]}</span><span class="hl-pt">:</span><span class="hl-cs">${m[6]}</span><span class="hl-pt">${e(m[7])}{</span>${toks}<span class="hl-pt">}</span>${e(m[11])}`;}
+  m=line.match(/^(\s*)(transition)(\s+)(\w+)(\s*)(\[guard:\s*)?([^\]]*)?(\])?/);
+  if(m){let o=`${e(m[1])}<span class="hl-kw">${m[2]}</span>${e(m[3])}<span class="hl-nm">${m[4]}</span>`;if(m[6])o+=`<span class="hl-pt">${e(m[5]+m[6])}</span><span class="hl-gd">${e(m[7]||'')}</span><span class="hl-pt">${m[8]||'}'}</span>`;return o;}
+  m=line.match(/^(\s*)(arc)(\s+)(\w+)(\s*-->\s*)(\w+)(\s*:\s*)(.*)/);
+  if(m)return`${e(m[1])}<span class="hl-kw">${m[2]}</span>${e(m[3])}<span class="hl-nm">${m[4]}</span><span class="hl-pt">${e(m[5])}</span><span class="hl-nm">${m[6]}</span><span class="hl-pt">${e(m[7])}</span><span class="hl-ex">${e(m[8])}</span>`;
+  return e(line);
+}
+function updateHL() {
+  const val=document.getElementById('cpn-editor').value;
+  const lines=val.split('\n');
+  document.getElementById('hl-overlay').innerHTML=lines.map(l=>`<div>${hlLine(l)}</div>`).join('');
+  document.getElementById('line-nums').innerHTML=lines.map((_,i)=>`<div>${i+1}</div>`).join('');
+}
+const ed=document.getElementById('cpn-editor');
+ed.addEventListener('input',()=>{updateHL();debounceApply();});
+ed.addEventListener('scroll',()=>{document.getElementById('hl-overlay').scrollTop=ed.scrollTop;ed.scrollLeft&&(document.getElementById('hl-overlay').scrollLeft=ed.scrollLeft);});
+ed.addEventListener('keydown',ev=>{
+  if(ev.key==='Tab'){ev.preventDefault();const s=ed.selectionStart,e2=ed.selectionEnd;ed.value=ed.value.slice(0,s)+'  '+ed.value.slice(e2);ed.selectionStart=ed.selectionEnd=s+2;updateHL();}
+  if(ev.key==='Enter'&&ev.ctrlKey)applyText();
+});
+let applyTimer=null;
+function debounceApply(){clearTimeout(applyTimer);applyTimer=setTimeout(applyText,700);}
+function applyText() {
+  const src=ed.value;
+  const res=parseCPN(src);
+  const dot=document.getElementById('dot'),dotTxt=document.getElementById('dot-txt'),errBar=document.getElementById('err-bar');
+  if(res.errors.length){errBar.textContent=res.errors.join(' | ');errBar.style.display='';dot.classList.add('err');dotTxt.textContent=`${res.errors.length} error(s)`;return;}
+  errBar.style.display='none';dot.classList.remove('err');dotTxt.textContent='OK';
+  const pos={};[...S.places,...S.transitions].forEach(n=>{pos[n.id]={x:n.x,y:n.y};});
+  S.colorsets=res.cs;
+  S.places=res.places.map(p=>({...p,x:pos[p.id]?.x||0,y:pos[p.id]?.y||0}));
+  S.transitions=res.transitions.map(t=>({...t,x:pos[t.id]?.x||0,y:pos[t.id]?.y||0}));
+  const byLabel={};[...S.places,...S.transitions].forEach(n=>{byLabel[n.label]=n;});
+  S.arcs=res.arcs.map((a,i)=>({id:'arc'+i,src:byLabel[a.src]?.id||a.src,tgt:byLabel[a.tgt]?.id||a.tgt,expr:a.expr})).filter(a=>a.src&&a.tgt);
+  if(![...S.places,...S.transitions].some(n=>n.x))autoLayout();
+  log(`Loaded: ${S.places.length}P ${S.transitions.length}T ${S.arcs.length}A`,'system');
+  if(S.mode==='visual')render();
+}
+
+// ═══════════════════════════════════════════════════════════
+// MODE SWITCHING
+// ═══════════════════════════════════════════════════════════
+function switchMode(mode) {
+  S.mode=mode;
+  document.querySelectorAll('.mode-tab').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
+  document.getElementById('canvas-wrap').style.display=mode==='visual'?'':'none';
+  document.getElementById('editor-wrap').style.display=mode==='text'?'flex':'none';
+  if(mode==='text'){ed.value=serializeCPN();updateHL();}
+  else{applyText();render();}
+}
+document.querySelectorAll('.mode-tab').forEach(b=>b.addEventListener('click',()=>switchMode(b.dataset.mode)));
+
+// ═══════════════════════════════════════════════════════════
+// RIGHT PANEL TABS
+// ═══════════════════════════════════════════════════════════
+function switchRightTab(tab) {
+  document.querySelectorAll('.right-tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
+  document.getElementById('log-pane').style.display=tab==='log'?'':'none';
+  document.getElementById('enabled-pane').style.display=tab==='log'?'':'none';
+  document.getElementById('analysis-pane').style.display=tab==='analysis'?'':'none';
+  document.getElementById('analysis-pane').classList.toggle('active',tab==='analysis');
+}
+document.querySelectorAll('.right-tab').forEach(b=>b.addEventListener('click',()=>switchRightTab(b.dataset.tab)));
+
+// ═══════════════════════════════════════════════════════════
+// TOOL PALETTE
+// ═══════════════════════════════════════════════════════════
+document.querySelectorAll('.tool-btn').forEach(b=>b.addEventListener('click',()=>{
+  S.tool=b.dataset.tool;clearArcDraw();
+  document.querySelectorAll('.tool-btn').forEach(x=>x.classList.toggle('active',x===b));
+  const svg=document.getElementById('cpn-svg');
+  svg.className=`tool-${S.tool}`;
+}));
+
+// ═══════════════════════════════════════════════════════════
+// EXPORT / IMPORT
+// ═══════════════════════════════════════════════════════════
+function dl(content, filename, type) {
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([content],{type}));
+  a.download=filename;a.click();
+}
+document.getElementById('btn-svg').addEventListener('click',()=>{
+  const svg=document.getElementById('cpn-svg');
+  let s=new XMLSerializer().serializeToString(svg);
+  s=s.replace('<svg','<svg xmlns="http://www.w3.org/2000/svg" style="background:#07101e"');
+  dl(s,'cpn-diagram.svg','image/svg+xml');
+});
+document.getElementById('btn-png').addEventListener('click',()=>{
+  const svg=document.getElementById('cpn-svg');
+  const W=svg.clientWidth,H=svg.clientHeight;
+  const s=new XMLSerializer().serializeToString(svg);
+  const blob=new Blob([s],{type:'image/svg+xml;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const img=new Image();
+  img.onload=()=>{
+    const c=document.createElement('canvas');c.width=W*2;c.height=H*2;
+    const ctx=c.getContext('2d');ctx.scale(2,2);ctx.fillStyle='#07101e';ctx.fillRect(0,0,W,H);
+    ctx.drawImage(img,0,0,W,H);URL.revokeObjectURL(url);
+    c.toBlob(b=>{dl(URL.createObjectURL(b),'cpn-diagram.png','image/png');const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='cpn-diagram.png';a.click();},'image/png');
+  };img.src=url;
+});
+document.getElementById('btn-pnml').addEventListener('click',()=>dl(serializePNML(),'net.pnml','application/xml'));
+document.getElementById('btn-cpn').addEventListener('click',()=>dl(serializeCPN(),'net.cpn','text/plain'));
+document.getElementById('btn-import').addEventListener('click',()=>document.getElementById('file-inp').click());
+document.getElementById('file-inp').addEventListener('change',ev=>{
+  const f=ev.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=e=>{loadFromText(e.target.result);};
+  r.readAsText(f);ev.target.value='';
+});
+
+// ═══════════════════════════════════════════════════════════
+// LOAD FROM TEXT
+// ═══════════════════════════════════════════════════════════
+function loadFromText(src) {
+  S.simStep=0;S.selected=null;S.history=[];S.histIdx=-1;S.stateSpace=null;
+  document.getElementById('deadlock-badge').style.display='none';
+  document.getElementById('no-analysis').style.display='';
+  document.getElementById('analysis-results').style.display='none';
+  ed.value=src;updateHL();applyText();
+  if(S.mode==='text')return;
+  autoLayout();render();fitToScreen();
+  log('Net loaded','system');
+}
+
+// ═══════════════════════════════════════════════════════════
+// EXAMPLES
+// ═══════════════════════════════════════════════════════════
+document.querySelectorAll('.ex-btn').forEach(b=>b.addEventListener('click',()=>loadFromText(EXAMPLES[b.dataset.ex])));
+
+// ═══════════════════════════════════════════════════════════
+// SIM CONTROLS
+// ═══════════════════════════════════════════════════════════
+document.getElementById('btn-step').addEventListener('click',simStep);
+document.getElementById('btn-reset').addEventListener('click',simReset);
+document.getElementById('btn-play').addEventListener('click',()=>S.playing?stopPlay():startPlay());
+document.getElementById('analyse-btn').addEventListener('click',runAnalysis);
+
+// ═══════════════════════════════════════════════════════════
+// REACHABILITY QUERY
+// ═══════════════════════════════════════════════════════════
+document.getElementById('reach-btn').addEventListener('click',()=>{
+  if(!S.stateSpace){log('Run analysis first','warn');return;}
+  const inp=document.getElementById('reach-input').value.trim();
+  const res=document.getElementById('reach-result');
+  try {
+    const partial=JSON.parse(inp);
+    // Build full marking from current initial + override with query
+    const target={};S.places.forEach(p=>{target[p.id]=partial[p.label]||partial[p.id]||[];});
+    const r=S.stateSpace.isReachable(target);
+    res.style.display='';
+    if(r.reachable){res.className='reach-result yes';res.textContent=`✓ Reachable${r.path?` (${r.path.length} steps)`:''}`;res.style.background='#051508';res.style.color='var(--trans-hi)';res.style.border='1px solid var(--trans)';}
+    else{res.className='reach-result no';res.textContent='✕ Not reachable from initial marking';res.style.background='#150505';res.style.color='var(--red)';res.style.border='1px solid var(--red)';}
+    res.style.padding='5px 7px';res.style.borderRadius='3px';res.style.fontSize='10px';res.style.marginTop='5px';
+  } catch(e) {res.style.display='';res.textContent='Invalid JSON: '+e.message;res.style.background='#150505';res.style.color='var(--amber)';res.style.border='1px solid var(--amber)';res.style.padding='5px 7px';res.style.borderRadius='3px';res.style.fontSize='10px';res.style.marginTop='5px';}
+});
+
+// ═══════════════════════════════════════════════════════════
+// KEYBOARD SHORTCUTS
+// ═══════════════════════════════════════════════════════════
+document.addEventListener('keydown',ev=>{
+  if(['INPUT','TEXTAREA'].includes(ev.target.tagName))return;
+  const k=ev.key;
+  if(k==='s'||k==='S')document.querySelector('[data-tool="select"]').click();
+  if(k==='p'||k==='P')document.querySelector('[data-tool="place"]').click();
+  if(k==='t'||k==='T')document.querySelector('[data-tool="transition"]').click();
+  if(k==='a'||k==='A')document.querySelector('[data-tool="arc"]').click();
+  if(k==='d'||k==='D')document.querySelector('[data-tool="delete"]').click();
+  if(k===' '){ev.preventDefault();simStep();}
+  if(k==='r'||k==='R')simReset();
+  if(k==='g'||k==='G'){S.snap=!S.snap;document.getElementById('snap-chk').checked=S.snap;document.getElementById('sb-snap').querySelector('.sb-val').textContent=S.snap?'ON':'OFF';}
+  if(k==='f'||k==='F')fitToScreen();
+  if(k==='+'||k==='=')zoomAt(document.getElementById('canvas-wrap').clientWidth/2,document.getElementById('canvas-wrap').clientHeight/2,1.15);
+  if(k==='-')zoomAt(document.getElementById('canvas-wrap').clientWidth/2,document.getElementById('canvas-wrap').clientHeight/2,0.87);
+  if(k==='?')document.getElementById('btn-help').click();
+  if(k==='Escape'){clearArcDraw();S.selected=null;closeCtxMenu();render();}
+  if(k==='Delete'||k==='Backspace'){if(S.selected)execCmd(Cmd.deleteNode(S.selected.type,S.selected.id));}
+  if(k==='z'&&(ev.ctrlKey||ev.metaKey)&&!ev.shiftKey){ev.preventDefault();undo();}
+  if((k==='z'&&ev.shiftKey&&(ev.ctrlKey||ev.metaKey))||(k==='y'&&(ev.ctrlKey||ev.metaKey))){ev.preventDefault();redo();}
+});
+
+// ═══════════════════════════════════════════════════════════
+// AUTOSAVE to localStorage
+// ═══════════════════════════════════════════════════════════
+function autosave() {
+  try { localStorage.setItem('cpntool-state',serializeCPN()); } catch(e){}
+}
+// setInterval(autosave,15000);
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+function init() {
+  log('CPN Tool — Professional Edition ready','system');
+  log('Press ? for keyboard shortcuts','system');
+  // Try to restore autosaved state
+  const saved=localStorage.getItem('cpntool-state');
+  const src=saved&&saved.includes('place')?saved:EXAMPLES.producer;
+  loadFromText(src);
+  applyTransform();
+}
+// init();
+
+  Object.assign(S, injectedS);
+
+  return {
+    parseCPN, serializeCPN, serializePNML,
+    StateSpace, getEnabled, fireItem, resolveExpr,
+    execCmd, undo, redo, Cmd,
+    findNode, nodeKind, snapGrid, getEdgePt, hlLine,
+    get S() { return S; }
+  };
+}
+
+
+// ── TEST FRAMEWORK ────────────────────────────────────────────
+class Runner {
+  constructor() { this.suites=[]; this.results={pass:0,fail:0,total:0}; }
+  suite(name,fn){ this.suites.push({name,fn,tests:[]}); }
+  async runAll(){
+    const t0=performance.now();
+    this.results={pass:0,fail:0,total:0};
+    for(const s of this.suites){
+      s.tests=[];
+      const t=(name,fn)=>s.tests.push({name,fn,status:'pending'});
+      s.fn(t);
+    }
+    this.results.total=this.suites.reduce((n,s)=>n+s.tests.length,0);
+    let done=0;
+    for(const s of this.suites){
+      const st0=performance.now();
+      for(const test of s.tests){
+        const tt0=performance.now();
+        try{await test.fn();test.status='pass';test.time=performance.now()-tt0;this.results.pass++;}
+        catch(e){test.status='fail';test.error=e.message;test.time=performance.now()-tt0;this.results.fail++;}
+        done++;
+        document.getElementById('pb').style.width=(done/this.results.total*100)+'%';
+      }
+      s.time=performance.now()-st0;
+      renderSuite(s);
+    }
+    const el=performance.now()-t0;
+    document.getElementById('sp').textContent=this.results.pass;
+    document.getElementById('sf').textContent=this.results.fail;
+    document.getElementById('st').textContent=this.results.total;
+    document.getElementById('stm').textContent=el.toFixed(0)+'ms';
+    document.getElementById('pb').style.background=this.results.fail===0?'#16a34a':'#dc2626';
+  }
+}
+
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function renderSuite(s){
+  const pass=s.tests.filter(t=>t.status==='pass').length;
+  const fail=s.tests.filter(t=>t.status==='fail').length;
+  const bid='sb-'+s.name.replace(/\W/g,'_');
+  const div=document.createElement('div');div.className='suite';
+  div.innerHTML=`<div class="sh" onclick="tog('${bid}')">
+    <span class="sn">${esc(s.name)}</span>
+    <span class="st">${s.time.toFixed(0)}ms</span>
+    <span class="sb ${fail>0?'no':'ok'}">${fail>0?fail+' FAILED':pass+'/'+s.tests.length+' PASS'}</span>
+  </div>
+  <div class="tbody ${fail>0?'open':''}" id="${bid}">
+    ${s.tests.map(t=>`<div class="tr">
+      <span class="ti ${t.status==='pass'?'tp':'tf'}">${t.status==='pass'?'✓':'✗'}</span>
+      <div style="flex:1"><div class="tn">${esc(t.name)}</div>${t.error?`<div class="te">${esc(t.error)}</div>`:''}</div>
+      <span class="tt">${t.time.toFixed(1)}ms</span>
+    </div>`).join('')}
+  </div>`;
+  document.getElementById('suites').appendChild(div);
+}
+function tog(id){document.getElementById(id).classList.toggle('open');}
+
+// ── SETUP ────────────────────────────────────────────────────
+function makeMockDoc(){
+  const el=()=>({setAttribute(){},getAttribute(){return null;},addEventListener(){},removeEventListener(){},
+    appendChild(c){return c;},removeChild(){},innerHTML:'',textContent:'',value:'',style:{},
+    classList:{add(){},remove(){},toggle(){},contains(){return false;}},
+    scrollTop:0,scrollHeight:0,querySelectorAll(){return[];},clientWidth:800,clientHeight:500,
+    getScreenCTM(){return{inverse(){return{};}}},
+    createSVGPoint(){return{x:0,y:0,matrixTransform(){return{x:0,y:0};}};},
+  });
+  return{getElementById:()=>el(),createElementNS:(n,t)=>el(),
+    createElement:()=>({href:'',download:'',click(){}}),
+    querySelectorAll:()=>[],addEventListener:()=>{},removeEventListener:()=>{}};
+}
+
+const initS={places:[],transitions:[],arcs:[],colorsets:{},history:[],histIdx:-1,
+  selected:null,snap:true,simStep:0,nc:0,ac:0,mode:'visual',tool:'select',
+  arcSrc:null,playing:false,tx:0,ty:0,scale:1,log:[]};
+const T=createToolScope(initS,makeMockDoc(),{getItem:()=>null,setItem(){}});
+const S=T.S;
+
+// ── ASSERTIONS ───────────────────────────────────────────────
+function assert(c,m){if(!c)throw new Error(m||'Failed');}
+function eq(a,b,m){if(a!==b)throw new Error((m||'')+'\n  expected: '+JSON.stringify(b)+'\n  got:      '+JSON.stringify(a));}
+function deepEq(a,b,m){if(JSON.stringify(a)!==JSON.stringify(b))throw new Error((m||'')+'\n  expected: '+JSON.stringify(b)+'\n  got:      '+JSON.stringify(a));}
+function approx(a,b,tol,m){if(Math.abs(a-b)>tol)throw new Error((m||'')+' expected ≈'+b+'±'+tol+' got:'+a);}
+
+function resetS(){S.places=[];S.transitions=[];S.arcs=[];S.colorsets={};S.history=[];S.histIdx=-1;S.selected=null;S.snap=true;S.simStep=0;}
+function setupPC(){
+  S.places=[
+    {id:'Ready',tokens:['j1','j2','j3'],initTokens:['j1','j2','j3']},
+    {id:'Idle', tokens:['w1','w2'],initTokens:['w1','w2']},
+    {id:'Busy', tokens:[],initTokens:[]},
+    {id:'Done', tokens:[],initTokens:[]},
+  ];
+  S.transitions=[{id:'Assign',label:'Assign'},{id:'Complete',label:'Complete'}];
+  S.arcs=[{src:'Ready',tgt:'Assign',expr:'j'},{src:'Idle',tgt:'Assign',expr:'w'},
+    {src:'Assign',tgt:'Busy',expr:'(j,w)'},{src:'Busy',tgt:'Complete',expr:'(j,w)'},
+    {src:'Complete',tgt:'Done',expr:'j'},{src:'Complete',tgt:'Idle',expr:'w'}];
+  S.simStep=0;const m={};S.places.forEach(p=>{m[p.id]=[...p.initTokens];});return m;
+}
+
+// ── TEST SUITES ───────────────────────────────────────────────
+const R=new Runner();
+
+R.suite('1. Parser — parseCPN',t=>{
+  t('colorset values',()=>{const r=T.parseCPN('colorset J={j1,j2}');deepEq([...r.cs.J].sort(),['j1','j2']);});
+  t('place: id, colorSet, initTokens',()=>{const r=T.parseCPN('place P:J={a,b}');eq(r.places[0].id,'P');deepEq([...r.places[0].initTokens].sort(),['a','b']);});
+  t('place: empty tokens',()=>{deepEq(T.parseCPN('place B:T={}').places[0].initTokens,[]);});
+  t('place: × in colorset',()=>{eq(T.parseCPN('place E:P×F={}').places[0].colorSet,'P×F');});
+  t('place: * in colorset',()=>{eq(T.parseCPN('place E:J*W={}').places[0].colorSet,'J*W');});
+  t('transition: no guard defaults to true',()=>{eq(T.parseCPN('transition T1').transitions[0].guard,'true');});
+  t('transition: guard parsed',()=>{eq(T.parseCPN('transition T1 [guard: x in J]').transitions[0].guard,'x in J');});
+  t('arc: simple expr',()=>{eq(T.parseCPN('arc A-->B:j').arcs[0].expr,'j');});
+  t('arc: tuple expr',()=>{eq(T.parseCPN('arc A-->B:(j,w)').arcs[0].expr,'(j,w)');});
+  t('comment // ignored',()=>{const r=T.parseCPN('// cmt\nplace P:T={a}');eq(r.places.length,1);eq(r.errors.length,0);});
+  t('comment # ignored',()=>{eq(T.parseCPN('# cmt\nplace P:T={}').errors.length,0);});
+  t('blank lines ignored',()=>{eq(T.parseCPN('\n\nplace P:T={}\n\n').places.length,1);});
+  t('garbage line → errors array',()=>{assert(T.parseCPN('garbage here').errors.length>=1);});
+});
+
+R.suite('2. State Space — explore + analysis',t=>{
+  t('PC: 9 states',()=>{const m=setupPC();const ss=new T.StateSpace();eq(ss.explore(m,1000).nodeCount,9);});
+  t('PC: 10 arcs',()=>{const m=setupPC();const ss=new T.StateSpace();eq(ss.explore(m,1000).edgeCount,10);});
+  t('PC: 1 deadlock',()=>{const m=setupPC();const ss=new T.StateSpace();eq(ss.explore(m,1000).deadlocks.length,1);});
+  t('PC: Ready bounded ≤3',()=>{const m=setupPC();const ss=new T.StateSpace();ss.explore(m,1000);eq(ss.boundedness().Ready,3);});
+  t('PC: Busy bounded ≤2',()=>{const m=setupPC();const ss=new T.StateSpace();ss.explore(m,1000);eq(ss.boundedness().Busy,2);});
+  t('PC: Assign live',()=>{const m=setupPC();const ss=new T.StateSpace();ss.explore(m,1000);eq(ss.liveness().Assign,true);});
+  t('PC: Complete live',()=>{const m=setupPC();const ss=new T.StateSpace();ss.explore(m,1000);eq(ss.liveness().Complete,true);});
+  t('PC: SCC count = 9',()=>{const m=setupPC();const ss=new T.StateSpace();ss.explore(m,1000);eq(ss.sccCount(),9);});
+  t('PC: all-done marking reachable',()=>{const m=setupPC();const ss=new T.StateSpace();ss.explore(m,1000);eq(ss.isReachable({Ready:[],Idle:['w1','w2'],Busy:[],Done:['j1','j2','j3']}).reachable,true);});
+  t('PC: impossible marking unreachable',()=>{const m=setupPC();const ss=new T.StateSpace();ss.explore(m,1000);eq(ss.isReachable({Ready:['j1'],Idle:[],Busy:[],Done:['j1']}).reachable,false);});
+  t('PC: path length ≥5',()=>{const m=setupPC();const ss=new T.StateSpace();ss.explore(m,1000);const r=ss.isReachable({Ready:[],Idle:['w1','w2'],Busy:[],Done:['j1','j2','j3']});assert(r.path&&r.path.length>=5,'path: '+r.path?.length);});
+  t('Phil: 4 states, 0 deadlocks, 1 SCC',()=>{
+    S.places=[{id:'Tk',tokens:['p1','p2'],initTokens:['p1','p2']},{id:'Ea',tokens:[],initTokens:[]},{id:'Fo',tokens:['f1','f2'],initTokens:['f1','f2']}];
+    S.transitions=[{id:'Pu',label:'PickUp'},{id:'Pd',label:'PutDown'}];
+    S.arcs=[{src:'Tk',tgt:'Pu',expr:'p'},{src:'Fo',tgt:'Pu',expr:'f'},{src:'Pu',tgt:'Ea',expr:'(p,f)'},{src:'Ea',tgt:'Pd',expr:'(p,f)'},{src:'Pd',tgt:'Tk',expr:'p'},{src:'Pd',tgt:'Fo',expr:'f'}];
+    const m={};S.places.forEach(p=>{m[p.id]=[...p.initTokens];});
+    const ss=new T.StateSpace();const st=ss.explore(m,1000);
+    eq(st.nodeCount,4);eq(st.deadlocks.length,0);eq(ss.sccCount(),1);
+  });
+  t('Mutex: semaphore and critical bounded to 1',()=>{
+    S.places=[{id:'R',tokens:['p1','p2'],initTokens:['p1','p2']},{id:'C',tokens:[],initTokens:[]},{id:'D',tokens:[],initTokens:[]},{id:'Sm',tokens:['s'],initTokens:['s']}];
+    S.transitions=[{id:'En',label:'Enter'},{id:'Ex',label:'Exit'}];
+    S.arcs=[{src:'R',tgt:'En',expr:'p'},{src:'Sm',tgt:'En',expr:'s'},{src:'En',tgt:'C',expr:'p'},{src:'C',tgt:'Ex',expr:'p'},{src:'Ex',tgt:'D',expr:'p'},{src:'Ex',tgt:'Sm',expr:'s'}];
+    const m={};S.places.forEach(p=>{m[p.id]=[...p.initTokens];});
+    const ss=new T.StateSpace();ss.explore(m,1000);const b=ss.boundedness();eq(b.Sm,1,'semaphore');eq(b.C,1,'critical');
+  });
+  t('Truncation caps at maxStates',()=>{S.places=[{id:'A',tokens:['a','b','c'],initTokens:['a','b','c']},{id:'B',tokens:[],initTokens:[]}];S.transitions=[{id:'T',label:'T'}];S.arcs=[{src:'A',tgt:'T',expr:'x'},{src:'T',tgt:'B',expr:'x'}];const ss=new T.StateSpace();const st=ss.explore({A:['a','b','c'],B:[]},2);eq(st.truncated,true);eq(st.nodeCount,2);});
+  t('markingKey: order-independent',()=>{const ss=new T.StateSpace();eq(ss.markingKey({A:['x','y'],B:['z']}),ss.markingKey({B:['z'],A:['y','x']}));});
+  t('cloneM: independent deep copy',()=>{const ss=new T.StateSpace();const o={A:['x'],B:[]};const c=ss.cloneM(o);c.A.push('z');eq(o.A.length,1);});
+});
+
+R.suite('3. Simulation — getEnabled + fireItem',t=>{
+  t('initial: only Assign enabled',()=>{const m=setupPC();const en=T.getEnabled();eq(en.length,1);eq(en[0].t.id,'Assign');});
+  t('fire Assign: Ready loses 1 token',()=>{setupPC();T.fireItem(T.getEnabled()[0]);eq(S.places.find(p=>p.id==='Ready').tokens.length,2);});
+  t('fire Assign: Idle loses 1 token',()=>{setupPC();T.fireItem(T.getEnabled()[0]);eq(S.places.find(p=>p.id==='Idle').tokens.length,1);});
+  t('fire Assign: Busy gains tuple',()=>{setupPC();T.fireItem(T.getEnabled()[0]);const b=S.places.find(p=>p.id==='Busy');eq(b.tokens.length,1);assert(b.tokens[0].startsWith('('),'not a tuple: '+b.tokens[0]);});
+  t('after Assign: Complete enabled',()=>{setupPC();T.fireItem(T.getEnabled()[0]);assert(T.getEnabled().some(e=>e.t.id==='Complete'));});
+  t('deadlock: 0 enabled transitions',()=>{setupPC();S.places.find(p=>p.id==='Ready').tokens=[];S.places.find(p=>p.id==='Done').tokens=['j1','j2','j3'];eq(T.getEnabled().length,0);});
+  t('simStep increments on fire',()=>{setupPC();eq(S.simStep,0);T.fireItem(T.getEnabled()[0]);eq(S.simStep,1);});
+  t('resolveExpr: single variable',()=>eq(T.resolveExpr('x',{x:'job1'}),'job1'));
+  t('resolveExpr: tuple both bound',()=>eq(T.resolveExpr('(j,w)',{j:'p1',w:'f1'}),'(p1,f1)'));
+  t('resolveExpr: literal passthrough',()=>eq(T.resolveExpr('job1',{}),'job1'));
+  t('resolveExpr: partial tuple',()=>eq(T.resolveExpr('(x,y)',{x:'p1'}),'(p1,y)'));
+});
+
+R.suite('4. Undo/Redo — command pattern',t=>{
+  t('addPlace do/undo',()=>{resetS();T.execCmd(T.Cmd.addPlace(96,96));eq(S.places.length,1);T.undo();eq(S.places.length,0);});
+  t('addTransition do/undo',()=>{resetS();T.execCmd(T.Cmd.addTransition(200,200));eq(S.transitions.length,1);T.undo();eq(S.transitions.length,0);});
+  t('addArc do/undo',()=>{resetS();S.places=[{id:'P1',x:0,y:0,label:'P',colorSet:'T',initTokens:[],tokens:[]}];S.transitions=[{id:'T1',x:100,y:0,label:'T',guard:'true'}];T.execCmd(T.Cmd.addArc('P1','T1','x'));eq(S.arcs.length,1);T.undo();eq(S.arcs.length,0);});
+  t('deleteNode removes node+arcs, undo restores',()=>{resetS();S.places=[{id:'P1',x:0,y:0,label:'P',colorSet:'T',initTokens:[],tokens:[]}];S.transitions=[{id:'T1',x:100,y:0,label:'T',guard:'true'}];S.arcs=[{id:'a1',src:'P1',tgt:'T1',expr:'x'}];T.execCmd(T.Cmd.deleteNode('place','P1'));eq(S.places.length,0);eq(S.arcs.length,0);T.undo();eq(S.places.length,1);eq(S.arcs.length,1);});
+  t('editProp do/undo',()=>{resetS();S.places=[{id:'P',x:0,y:0,label:'Old',colorSet:'T',initTokens:[],tokens:[]}];T.execCmd(T.Cmd.editProp('P','label','Old','New'));eq(S.places[0].label,'New');T.undo();eq(S.places[0].label,'Old');});
+  t('history grows on execCmd',()=>{resetS();T.execCmd(T.Cmd.addPlace(96,96));T.execCmd(T.Cmd.addPlace(200,200));eq(S.history.length,2);eq(S.histIdx,1);});
+  t('undo at start: no-op',()=>{resetS();T.undo();eq(S.places.length,0);});
+  t('redo after undo',()=>{resetS();T.execCmd(T.Cmd.addPlace(96,96));T.undo();eq(S.places.length,0);T.redo();eq(S.places.length,1);});
+  t('new cmd truncates redo stack',()=>{resetS();T.execCmd(T.Cmd.addPlace(96,96));T.execCmd(T.Cmd.addPlace(200,200));T.undo();T.execCmd(T.Cmd.addPlace(300,300));eq(S.history.length,2);eq(S.histIdx,1);});
+  t('redo at end: no-op',()=>{resetS();T.execCmd(T.Cmd.addPlace(96,96));T.redo();eq(S.places.length,1);});
+});
+
+R.suite('5. Arc Geometry — getEdgePt',t=>{
+  const PR=46,TW=90,TH=40;
+  t('place: exit on circle surface',()=>{resetS();S.places=[{id:'P',x:200,y:200,label:'P',colorSet:'T',initTokens:[],tokens:[]}];const ep=T.getEdgePt('P',400,200);approx(Math.sqrt((ep.x-200)**2+(ep.y-200)**2),PR,0.5,'dist');});
+  t('place: horizontal exit x correct',()=>{resetS();S.places=[{id:'P',x:200,y:200,label:'P',colorSet:'T',initTokens:[],tokens:[]}];const ep=T.getEdgePt('P',500,200);approx(ep.x,200+PR,0.5,'x');approx(ep.y,200,0.5,'y');});
+  t('place: vertical exit y correct',()=>{resetS();S.places=[{id:'P',x:200,y:200,label:'P',colorSet:'T',initTokens:[],tokens:[]}];const ep=T.getEdgePt('P',200,500);approx(ep.y,200+PR,0.5,'y');approx(ep.x,200,0.5,'x');});
+  t('place: diagonal exit on circle',()=>{resetS();S.places=[{id:'P',x:100,y:100,label:'P',colorSet:'T',initTokens:[],tokens:[]}];const ep=T.getEdgePt('P',300,300);approx(Math.sqrt((ep.x-100)**2+(ep.y-100)**2),PR,0.5,'dist');});
+  t('transition: horizontal exit at right edge',()=>{resetS();S.transitions=[{id:'T',x:300,y:200,label:'T',guard:'true'}];const ep=T.getEdgePt('T',600,200);approx(ep.x,300+TW/2,0.5,'x');approx(ep.y,200,0.5,'y');});
+  t('transition: vertical exit at bottom edge',()=>{resetS();S.transitions=[{id:'T',x:300,y:200,label:'T',guard:'true'}];const ep=T.getEdgePt('T',300,500);approx(ep.y,200+TH/2,0.5,'y');approx(ep.x,300,0.5,'x');});
+});
+
+R.suite('6. Syntax Highlighter — hlLine',t=>{
+  t('blank → <br>',()=>eq(T.hlLine(''),'<br>'));
+  t('whitespace-only → <br>',()=>eq(T.hlLine('   '),'<br>'));
+  t('// comment → hl-cm',()=>assert(T.hlLine('// cmt').includes('hl-cm')));
+  t('# comment → hl-cm',()=>assert(T.hlLine('# cmt').includes('hl-cm')));
+  t('colorset: hl-kw and hl-nm',()=>{const r=T.hlLine('colorset X={a}');assert(r.includes('hl-kw'));assert(r.includes('hl-nm'));});
+  t('colorset: tokens get hl-tk',()=>assert(T.hlLine('colorset X={a,b}').includes('hl-tk')));
+  t('place: hl-kw and hl-cs',()=>{const r=T.hlLine('place P:T={a}');assert(r.includes('hl-kw'));assert(r.includes('hl-cs'));});
+  t('transition: guard gets hl-gd',()=>assert(T.hlLine('transition T [guard: x]').includes('hl-gd')));
+  t('arc: expression gets hl-ex',()=>assert(T.hlLine('arc A-->B:j').includes('hl-ex')));
+  t('& escaped to &amp;',()=>assert(T.hlLine('// a&b').includes('&amp;')));
+  t('< and > escaped',()=>{const r=T.hlLine('// <x>');assert(r.includes('&lt;'));assert(r.includes('&gt;'));});
+  t('unrecognized: plain escaped text',()=>{assert(!T.hlLine('unknown stuff').includes('<span'),'should have no span');});
+});
+
+R.suite('7. Grid Snap — snapGrid',t=>{
+  t('on-grid: 0,96,240 unchanged',()=>{S.snap=true;eq(T.snapGrid(96),96);eq(T.snapGrid(0),0);eq(T.snapGrid(240),240);});
+  t('100 → 96',()=>{S.snap=true;eq(T.snapGrid(100),96);});
+  t('10 → 0',()=>{S.snap=true;eq(T.snapGrid(10),0);});
+  t('14 → 24',()=>{S.snap=true;eq(T.snapGrid(14),24);});
+  t('20 → 24',()=>{S.snap=true;eq(T.snapGrid(20),24);});
+  t('-10 → 0',()=>{S.snap=true;eq(T.snapGrid(-10),0);});
+  t('-14 → -24',()=>{S.snap=true;eq(T.snapGrid(-14),-24);});
+  t('snap=false: passthrough',()=>{S.snap=false;eq(T.snapGrid(100),100);eq(T.snapGrid(13.7),13.7);S.snap=true;});
+});
+
+R.suite('8. PNML Serializer — serializePNML',t=>{
+  function setupPNML(){resetS();S.places=[{id:'P1',x:100,y:100,label:'Ready',colorSet:'J',initTokens:['job1'],tokens:['job1']}];S.transitions=[{id:'T1',x:300,y:100,label:'Assign',guard:'j in J'}];S.arcs=[{id:'a1',src:'P1',tgt:'T1',expr:'j'}];}
+  t('root: pnml, net, page',()=>{setupPNML();const x=T.serializePNML();assert(x.includes('<pnml'));assert(x.includes('<net'));assert(x.includes('<page'));});
+  t('place: id and label',()=>{setupPNML();const x=T.serializePNML();assert(x.includes('id="P1"'));assert(x.includes('Ready'));});
+  t('transition: id and label',()=>{setupPNML();const x=T.serializePNML();assert(x.includes('id="T1"'));assert(x.includes('Assign'));});
+  t('arc: source and target',()=>{setupPNML();const x=T.serializePNML();assert(x.includes('source="P1"'));assert(x.includes('target="T1"'));});
+  t('initialMarking for non-empty place',()=>{setupPNML();const x=T.serializePNML();assert(x.includes('<initialMarking>'));assert(x.includes('job1'));});
+  t('no initialMarking for empty place',()=>{resetS();S.places=[{id:'P',x:0,y:0,label:'B',colorSet:'T',initTokens:[],tokens:[]}];S.transitions=[];S.arcs=[];assert(!T.serializePNML().includes('<initialMarking>'));});
+  t('guard in <condition>',()=>{setupPNML();const x=T.serializePNML();assert(x.includes('<condition>'));assert(x.includes('j in J'));});
+  t('trivial guard not in output',()=>{resetS();S.places=[];S.transitions=[{id:'T',x:0,y:0,label:'T',guard:'true'}];S.arcs=[];assert(!T.serializePNML().includes('<condition>'));});
+  t('& escaped',()=>{resetS();S.places=[{id:'P',x:0,y:0,label:'A&B',colorSet:'T',initTokens:[],tokens:[]}];S.transitions=[];S.arcs=[];assert(T.serializePNML().includes('A&amp;B'));});
+  t('< > escaped',()=>{resetS();S.places=[];S.transitions=[{id:'T',x:0,y:0,label:'X<Y>',guard:'true'}];S.arcs=[];assert(T.serializePNML().includes('X&lt;Y&gt;'));});
+  t('position attributes present',()=>{setupPNML();const x=T.serializePNML();assert(x.includes('x="100"')&&x.includes('y="100"'));});
+});
+
+R.suite('9. Integration — parse → simulate → analyse',t=>{
+  t('parse PC text → 4P 2T 6A 0 errors',()=>{
+    const src='colorset J={j1}\nplace R:J={j1}\nplace I:J={}\nplace B:J={}\nplace D:J={}\ntransition A\ntransition C\narc R-->A:j\narc I-->A:w\narc A-->B:(j,w)\narc B-->C:(j,w)\narc C-->D:j\narc C-->I:w';
+    const r=T.parseCPN(src);eq(r.errors.length,0);eq(r.places.length,4);eq(r.transitions.length,2);eq(r.arcs.length,6);
+  });
+  t('fire 2 Assigns → 2 tuples on Busy, Idle empty',()=>{
+    setupPC();
+    for(let i=0;i<2;i++){const en=T.getEnabled();const a=en.find(e=>e.t.id==='Assign');if(a)T.fireItem(a);}
+    eq(S.places.find(p=>p.id==='Busy').tokens.length,2);
+    eq(S.places.find(p=>p.id==='Idle').tokens.length,0);
+  });
+  t('analysis on PC → 9 states, 1 deadlock',()=>{const m=setupPC();const ss=new T.StateSpace();const st=ss.explore(m,1000);eq(st.nodeCount,9);eq(st.deadlocks.length,1);});
+  t('all transitions live in PC',()=>{const m=setupPC();const ss=new T.StateSpace();ss.explore(m,1000);assert(Object.values(ss.liveness()).every(v=>v),'some dead');});
+  t('reset restores initial marking',()=>{
+    setupPC();T.fireItem(T.getEnabled()[0]);eq(S.places.find(p=>p.id==='Ready').tokens.length,2);
+    S.places.forEach(p=>{p.tokens=[...p.initTokens];});S.simStep=0;
+    eq(S.places.find(p=>p.id==='Ready').tokens.length,3);eq(S.simStep,0);
+  });
+});
+
+
+R.suite('10. Tuple Token Parsing — paren-aware split',t=>{
+  t('tuple in initial marking parses correctly',()=>{
+    const r=T.parseCPN('colorset S={s1}\ncolorset R={get_index}\nplace P:S*R={(s1,get_index)}');
+    assert(r.errors.length===0,'parse error: '+r.errors);
+    eq(r.places[0].initTokens.length,1,'should have 1 token');
+    eq(r.places[0].initTokens[0],'(s1,get_index)','token should be the full tuple');
+  });
+  t('multiple tuples in initial marking',()=>{
+    const r=T.parseCPN('colorset S={s1,s2}\ncolorset R={a,b}\nplace P:S*R={(s1,a),(s2,b)}');
+    eq(r.places[0].initTokens.length,2,'should have 2 tokens');
+    eq(r.places[0].initTokens[0],'(s1,a)');
+    eq(r.places[0].initTokens[1],'(s2,b)');
+  });
+  t('mixed simple and tuple tokens in same list',()=>{
+    // colorset values (in colorset decl) should still split simply
+    const r=T.parseCPN('colorset S={a,b,c}');
+    assert(r.cs.S.includes('a')&&r.cs.S.includes('b')&&r.cs.S.includes('c'));
+  });
+  t('tuple token firing: arc consumes correct tuple',()=>{
+    resetS();
+    const r=T.parseCPN(
+      'colorset SESSION={s1}\ncolorset REQUEST={get_index}\n'+
+      'place Ready:SESSION={s1}\n'+
+      'place Pending:SESSION*REQUEST={(s1,get_index)}\n'+
+      'place Channel:SESSION*REQUEST={}\n'+
+      'transition Send [guard: s in SESSION, r in REQUEST]\n'+
+      'arc Ready-->Send:s\narc Pending-->Send:(s,r)\narc Send-->Channel:(s,r)'
+    );
+    eq(r.errors.length,0,'parse errors: '+r.errors);
+    S.colorsets=r.cs; S.places=r.places; S.transitions=r.transitions;
+    const byL={};[...S.places,...S.transitions].forEach(n=>{byL[n.label]=n;});
+    S.arcs=r.arcs.map((a,i)=>({id:'arc'+i,src:byL[a.src]?.id||a.src,tgt:byL[a.tgt]?.id||a.tgt,expr:a.expr}));
+    const en=T.getEnabled();
+    eq(en.length,1,'Send should be enabled');
+    eq(en[0].binding.s,'s1','s should bind to s1');
+    eq(en[0].binding.r,'get_index','r should bind to get_index');
+    T.fireItem(en[0]);
+    const channel=S.places.find(p=>p.label==='Channel');
+    eq(channel.tokens.length,1,'Channel should have 1 token');
+    eq(channel.tokens[0],'(s1,get_index)','token should be the tuple');
+  });
+  t('HTTPS CPN parses cleanly: 3 colorsets, 26 places, 13 transitions, 49 arcs',()=>{
+    resetS();
+    const httpsSrc=`colorset SESSION={s1,s2,s3}
+colorset REQUEST={get_index,get_api,post_data}
+colorset RESPONSE={r200,r404,r500}
+place ClientIdle:SESSION={s1,s2,s3}
+place ClientTCP:SESSION={}
+place ClientHelloSent:SESSION={}
+place ClientVerifying:SESSION={}
+place ClientReady:SESSION={}
+place ClientWaiting:SESSION={}
+place ResponseReceived:SESSION={}
+place ClientDone:SESSION={}
+place ClientError:SESSION={}
+place TCPChannel:SESSION={}
+place ClientHelloMsg:SESSION={}
+place ServerHelloMsg:SESSION={}
+place ClientFinishedMsg:SESSION={}
+place HttpRequestMsg:SESSION*REQUEST={}
+place HttpResponseMsg:SESSION*RESPONSE={}
+place CloseNotifyMsg:SESSION={}
+place ServerListening:SESSION={s1,s2,s3}
+place ServerTCP:SESSION={}
+place ServerHelloSent:SESSION={}
+place ServerReady:SESSION={}
+place ServerProcessing:SESSION*REQUEST={}
+place ServerDone:SESSION={}
+place ServerAborted:SESSION={}
+place PendingRequest:SESSION*REQUEST={(s1,get_index),(s2,get_api),(s3,post_data)}
+place TrustedCA:SESSION={s1,s2}
+place UntrustedCA:SESSION={s3}
+transition TCPConnect [guard: s in SESSION]
+transition SendClientHello [guard: s in SESSION]
+transition SendServerHello [guard: s in SESSION]
+transition VerifyCertOK [guard: s in SESSION]
+transition VerifyCertFail [guard: s in SESSION]
+transition SendClientFinished [guard: s in SESSION]
+transition ServerReceiveFinished [guard: s in SESSION]
+transition SendHttpRequest [guard: s in SESSION, r in REQUEST]
+transition ProcessRequest [guard: s in SESSION, r in REQUEST]
+transition SendHttpResponse [guard: s in SESSION, r in REQUEST]
+transition ReceiveResponse [guard: s in SESSION, r in REQUEST]
+transition InitiateClose [guard: s in SESSION]
+transition ReceiveClose [guard: s in SESSION]
+arc ClientIdle-->TCPConnect:s
+arc ServerListening-->TCPConnect:s
+arc TCPConnect-->ClientTCP:s
+arc TCPConnect-->ServerTCP:s
+arc TCPConnect-->TCPChannel:s
+arc ClientTCP-->SendClientHello:s
+arc TCPChannel-->SendClientHello:s
+arc SendClientHello-->ClientHelloSent:s
+arc SendClientHello-->ClientHelloMsg:s
+arc ServerTCP-->SendServerHello:s
+arc ClientHelloMsg-->SendServerHello:s
+arc SendServerHello-->ServerHelloSent:s
+arc SendServerHello-->ServerHelloMsg:s
+arc ClientHelloSent-->VerifyCertOK:s
+arc ServerHelloMsg-->VerifyCertOK:s
+arc TrustedCA-->VerifyCertOK:s
+arc VerifyCertOK-->ClientVerifying:s
+arc VerifyCertOK-->TrustedCA:s
+arc ClientHelloSent-->VerifyCertFail:s
+arc ServerHelloMsg-->VerifyCertFail:s
+arc UntrustedCA-->VerifyCertFail:s
+arc VerifyCertFail-->ClientError:s
+arc VerifyCertFail-->ServerAborted:s
+arc VerifyCertFail-->UntrustedCA:s
+arc ClientVerifying-->SendClientFinished:s
+arc SendClientFinished-->ClientReady:s
+arc SendClientFinished-->ClientFinishedMsg:s
+arc ServerHelloSent-->ServerReceiveFinished:s
+arc ClientFinishedMsg-->ServerReceiveFinished:s
+arc ServerReceiveFinished-->ServerReady:s
+arc ClientReady-->SendHttpRequest:s
+arc PendingRequest-->SendHttpRequest:(s,r)
+arc SendHttpRequest-->ClientWaiting:s
+arc SendHttpRequest-->HttpRequestMsg:(s,r)
+arc ServerReady-->ProcessRequest:s
+arc HttpRequestMsg-->ProcessRequest:(s,r)
+arc ProcessRequest-->ServerProcessing:(s,r)
+arc ServerProcessing-->SendHttpResponse:(s,r)
+arc SendHttpResponse-->ServerReady:s
+arc SendHttpResponse-->HttpResponseMsg:(s,r)
+arc ClientWaiting-->ReceiveResponse:s
+arc HttpResponseMsg-->ReceiveResponse:(s,r)
+arc ReceiveResponse-->ResponseReceived:s
+arc ResponseReceived-->InitiateClose:s
+arc ServerReady-->InitiateClose:s
+arc InitiateClose-->CloseNotifyMsg:s
+arc CloseNotifyMsg-->ReceiveClose:s
+arc ReceiveClose-->ClientDone:s
+arc ReceiveClose-->ServerDone:s`;
+    const r=T.parseCPN(httpsSrc);
+    eq(r.errors.length,0,'parse errors: '+r.errors);
+    eq(Object.keys(r.cs).length,3,'3 colorsets');
+    eq(r.places.length,26,'26 places');
+    eq(r.transitions.length,13,'13 transitions');
+    eq(r.arcs.length,49,'49 arcs');
+    // Verify tuple token parsing
+    const pending=r.places.find(p=>p.label==='PendingRequest');
+    eq(pending.initTokens.length,3,'3 pending request tokens');
+    eq(pending.initTokens[0],'(s1,get_index)','first token is full tuple');
+  });
+  t('HTTPS CPN: all 13 transitions live in state space exploration',()=>{
+    // Uses the S already set up from previous test — reload cleanly
+    resetS();
+    // Mini version with s1 only for speed
+    const mini=`colorset SESSION={s1}
+colorset REQUEST={get_index}
+colorset RESPONSE={r200}
+place ClientIdle:SESSION={s1}
+place ClientTCP:SESSION={}
+place ClientHelloSent:SESSION={}
+place ClientVerifying:SESSION={}
+place ClientReady:SESSION={}
+place ClientWaiting:SESSION={}
+place ResponseReceived:SESSION={}
+place ClientDone:SESSION={}
+place ClientError:SESSION={}
+place TCPChannel:SESSION={}
+place ClientHelloMsg:SESSION={}
+place ServerHelloMsg:SESSION={}
+place ClientFinishedMsg:SESSION={}
+place HttpRequestMsg:SESSION*REQUEST={}
+place HttpResponseMsg:SESSION*RESPONSE={}
+place CloseNotifyMsg:SESSION={}
+place ServerListening:SESSION={s1}
+place ServerTCP:SESSION={}
+place ServerHelloSent:SESSION={}
+place ServerReady:SESSION={}
+place ServerProcessing:SESSION*REQUEST={}
+place ServerDone:SESSION={}
+place ServerAborted:SESSION={}
+place PendingRequest:SESSION*REQUEST={(s1,get_index)}
+place TrustedCA:SESSION={s1}
+place UntrustedCA:SESSION={}
+transition TCPConnect
+transition SendClientHello
+transition SendServerHello
+transition VerifyCertOK
+transition VerifyCertFail
+transition SendClientFinished
+transition ServerReceiveFinished
+transition SendHttpRequest [guard: s in SESSION, r in REQUEST]
+transition ProcessRequest [guard: s in SESSION, r in REQUEST]
+transition SendHttpResponse [guard: s in SESSION, r in REQUEST]
+transition ReceiveResponse [guard: s in SESSION, r in REQUEST]
+transition InitiateClose
+transition ReceiveClose
+arc ClientIdle-->TCPConnect:s
+arc ServerListening-->TCPConnect:s
+arc TCPConnect-->ClientTCP:s
+arc TCPConnect-->ServerTCP:s
+arc TCPConnect-->TCPChannel:s
+arc ClientTCP-->SendClientHello:s
+arc TCPChannel-->SendClientHello:s
+arc SendClientHello-->ClientHelloSent:s
+arc SendClientHello-->ClientHelloMsg:s
+arc ServerTCP-->SendServerHello:s
+arc ClientHelloMsg-->SendServerHello:s
+arc SendServerHello-->ServerHelloSent:s
+arc SendServerHello-->ServerHelloMsg:s
+arc ClientHelloSent-->VerifyCertOK:s
+arc ServerHelloMsg-->VerifyCertOK:s
+arc TrustedCA-->VerifyCertOK:s
+arc VerifyCertOK-->ClientVerifying:s
+arc VerifyCertOK-->TrustedCA:s
+arc ClientHelloSent-->VerifyCertFail:s
+arc ServerHelloMsg-->VerifyCertFail:s
+arc UntrustedCA-->VerifyCertFail:s
+arc VerifyCertFail-->ClientError:s
+arc VerifyCertFail-->ServerAborted:s
+arc VerifyCertFail-->UntrustedCA:s
+arc ClientVerifying-->SendClientFinished:s
+arc SendClientFinished-->ClientReady:s
+arc SendClientFinished-->ClientFinishedMsg:s
+arc ServerHelloSent-->ServerReceiveFinished:s
+arc ClientFinishedMsg-->ServerReceiveFinished:s
+arc ServerReceiveFinished-->ServerReady:s
+arc ClientReady-->SendHttpRequest:s
+arc PendingRequest-->SendHttpRequest:(s,r)
+arc SendHttpRequest-->ClientWaiting:s
+arc SendHttpRequest-->HttpRequestMsg:(s,r)
+arc ServerReady-->ProcessRequest:s
+arc HttpRequestMsg-->ProcessRequest:(s,r)
+arc ProcessRequest-->ServerProcessing:(s,r)
+arc ServerProcessing-->SendHttpResponse:(s,r)
+arc SendHttpResponse-->ServerReady:s
+arc SendHttpResponse-->HttpResponseMsg:(s,r)
+arc ClientWaiting-->ReceiveResponse:s
+arc HttpResponseMsg-->ReceiveResponse:(s,r)
+arc ReceiveResponse-->ResponseReceived:s
+arc ResponseReceived-->InitiateClose:s
+arc ServerReady-->InitiateClose:s
+arc InitiateClose-->CloseNotifyMsg:s
+arc CloseNotifyMsg-->ReceiveClose:s
+arc ReceiveClose-->ClientDone:s
+arc ReceiveClose-->ServerDone:s`;
+    const r=T.parseCPN(mini);
+    eq(r.errors.length,0);
+    S.colorsets=r.cs; S.places=r.places; S.transitions=r.transitions;
+    const byL={};[...S.places,...S.transitions].forEach(n=>{byL[n.label]=n;});
+    S.arcs=r.arcs.map((a,i)=>({id:'arc'+i,src:byL[a.src]?.id||a.src,tgt:byL[a.tgt]?.id||a.tgt,expr:a.expr}));
+    const initM={};S.places.forEach(p=>{initM[p.id]=[...p.initTokens];});
+    const ss=new T.StateSpace();
+    ss.explore(initM,500);
+    const live=ss.liveness();
+    const dead=Object.entries(live).filter(([,v])=>!v).map(([k])=>S.transitions.find(t=>t.id===k)?.label);
+    assert(dead.length===0,'dead transitions: '+dead.join(','));
+  });
+});
+
+// ── BOOT ─────────────────────────────────────────────────────
+document.getElementById('run-btn').addEventListener('click',async()=>{
+  document.getElementById('suites').innerHTML='';
+  document.getElementById('pb').style.width='0';
+  document.getElementById('pb').style.background='var(--blue)';
+  ['sp','sf','stm'].forEach(id=>document.getElementById(id).textContent='—');
+  document.getElementById('run-btn').textContent='⏳ Running…';
+  document.getElementById('run-btn').disabled=true;
+  try{await R.runAll();}catch(e){alert('Runner error: '+e.message);}
+  document.getElementById('run-btn').textContent='▶ Run All';
+  document.getElementById('run-btn').disabled=false;
+});
+window.addEventListener('load',()=>setTimeout(()=>document.getElementById('run-btn').click(),200));
+</script>
+</body>
+</html>

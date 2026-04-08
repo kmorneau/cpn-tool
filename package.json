@@ -1,0 +1,20 @@
+{
+  "name": "cpn-tool-server",
+  "version": "1.0.0",
+  "description": "Colored Petri Net Tool — Node.js server with SQLite user administration",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test test/cpn-engine.test.js test/api.test.js",
+    "test:engine": "node --test test/cpn-engine.test.js",
+    "test:api": "node --test test/api.test.js"
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "better-sqlite3": "^9.4.3",
+    "connect-sqlite3": "^0.9.15",
+    "express": "^4.18.3",
+    "express-session": "^1.18.0"
+  }
+}

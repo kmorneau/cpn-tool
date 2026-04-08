@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# SQLite databases and WAL files
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# Environment / secrets
+.env
+.env.*
+
+# macOS
+.DS_Store
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Claude Code workspace files
+.claude/

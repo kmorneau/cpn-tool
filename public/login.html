@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CPN Tool — Sign In</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #07101e;
+  --bg2:      #09162a;
+  --bg3:      #0d1f38;
+  --border:   #0e2540;
+  --border2:  #183860;
+  --place-hi: #3b82f6;
+  --place:    #1d4ed8;
+  --enabled:  #60a5fa;
+  --text:     #dce8f4;
+  --text2:    #7aaacb;
+  --text3:    #4a7090;
+  --red:      #dc2626;
+  --green:    #16a34a;
+  --mono:     'IBM Plex Mono', monospace;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  height: 100%; background: var(--bg); font-family: var(--mono);
+  color: var(--text); display: flex; align-items: center; justify-content: center;
+}
+.card {
+  width: 360px; background: var(--bg2); border: 1px solid var(--border2);
+  border-radius: 8px; padding: 32px 28px;
+}
+.brand {
+  display: flex; align-items: baseline; gap: 6px; margin-bottom: 28px;
+}
+.logo-cpn  { font-size: 26px; font-weight: 700; color: var(--place-hi); letter-spacing: -1px; }
+.logo-tool { font-size: 12px; color: var(--text3); letter-spacing: 3px; }
+
+.tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 22px; }
+.tab {
+  flex: 1; padding: 8px 0; text-align: center; font-size: 19px;
+  letter-spacing: 1.5px; text-transform: uppercase; border: none;
+  background: transparent; color: var(--text3); cursor: pointer;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.tab.active { color: var(--enabled); border-bottom-color: var(--place); }
+
+.field { margin-bottom: 14px; }
+.lbl { font-size: 15px; letter-spacing: 1.5px; color: var(--text3); text-transform: uppercase; margin-bottom: 4px; }
+.inp {
+  width: 100%; background: var(--bg3); border: 1px solid var(--border2);
+  border-radius: 3px; color: var(--text); font-family: var(--mono);
+  font-size: 15px; padding: 8px 10px; outline: none;
+}
+.inp:focus { border-color: var(--place-hi); }
+
+.btn {
+  width: 100%; padding: 9px; font-family: var(--mono); font-size: 14px;
+  letter-spacing: 1px; text-transform: uppercase; border-radius: 3px;
+  border: 1px solid var(--place); background: var(--place-fill, #060f1e);
+  color: var(--enabled); cursor: pointer; margin-top: 6px;
+}
+.btn:hover { opacity: 0.85; }
+.btn:disabled { opacity: 0.4; cursor: default; }
+
+.msg {
+  margin-top: 14px; padding: 8px 10px; border-radius: 3px;
+  font-size: 19px; display: none;
+}
+.msg.err  { background: #1a0505; border: 1px solid var(--red);   color: #f87171; display: block; }
+.msg.ok   { background: #051508; border: 1px solid var(--green); color: #4ade80; display: block; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="brand">
+    <span class="logo-cpn">cpn</span>
+    <span class="logo-tool">TOOL</span>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" id="tab-login" onclick="showTab('login')">Sign In</button>
+    <button class="tab"        id="tab-reg"   onclick="showTab('reg')">Register</button>
+  </div>
+
+  <!-- Sign In -->
+  <form id="form-login" onsubmit="doLogin(event)">
+    <div class="field"><div class="lbl">Username</div>
+      <input class="inp" id="l-user" type="text" autocomplete="username" required></div>
+    <div class="field"><div class="lbl">Password</div>
+      <input class="inp" id="l-pass" type="password" autocomplete="current-password" required></div>
+    <button class="btn" type="submit" id="l-btn">Sign In</button>
+    <div class="msg" id="l-msg"></div>
+  </form>
+
+  <!-- Register -->
+  <form id="form-reg" style="display:none" onsubmit="doRegister(event)">
+    <div class="field"><div class="lbl">Username</div>
+      <input class="inp" id="r-user" type="text" autocomplete="username" required
+             pattern="\w+" title="Letters, numbers, and underscores only"></div>
+    <div class="field"><div class="lbl">Email</div>
+      <input class="inp" id="r-email" type="email" autocomplete="email" required></div>
+    <div class="field"><div class="lbl">Password</div>
+      <input class="inp" id="r-pass" type="password" autocomplete="new-password" minlength="8" required></div>
+    <div class="field"><div class="lbl">Confirm Password</div>
+      <input class="inp" id="r-pass2" type="password" autocomplete="new-password" minlength="8" required></div>
+    <button class="btn" type="submit" id="r-btn">Create Account</button>
+    <div class="msg" id="r-msg"></div>
+  </form>
+</div>
+
+<script>
+// If already logged in, go straight to the tool
+fetch('/auth/me').then(r => { if (r.ok) window.location.href = '/'; });
+
+function showTab(t) {
+  document.getElementById('form-login').style.display = t === 'login' ? '' : 'none';
+  document.getElementById('form-reg').style.display   = t === 'reg'   ? '' : 'none';
+  document.getElementById('tab-login').classList.toggle('active', t === 'login');
+  document.getElementById('tab-reg').classList.toggle('active',   t === 'reg');
+}
+
+function setMsg(id, text, kind) {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.className = 'msg ' + kind;
+}
+
+async function doLogin(ev) {
+  ev.preventDefault();
+  const btn = document.getElementById('l-btn');
+  btn.disabled = true;
+  const res = await fetch('/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      username: document.getElementById('l-user').value.trim(),
+      password: document.getElementById('l-pass').value,
+    }),
+  });
+  btn.disabled = false;
+  if (res.ok) {
+    window.location.href = '/';
+  } else {
+    const data = await res.json();
+    setMsg('l-msg', data.error || 'Login failed', 'err');
+  }
+}
+
+async function doRegister(ev) {
+  ev.preventDefault();
+  const pass  = document.getElementById('r-pass').value;
+  const pass2 = document.getElementById('r-pass2').value;
+  if (pass !== pass2) { setMsg('r-msg', 'Passwords do not match', 'err'); return; }
+
+  const btn = document.getElementById('r-btn');
+  btn.disabled = true;
+  const res = await fetch('/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      username: document.getElementById('r-user').value.trim(),
+      email:    document.getElementById('r-email').value.trim(),
+      password: pass,
+    }),
+  });
+  btn.disabled = false;
+  if (res.ok) {
+    window.location.href = '/';
+  } else {
+    const data = await res.json();
+    setMsg('r-msg', data.error || 'Registration failed', 'err');
+  }
+}
+</script>
+</body>
+</html>

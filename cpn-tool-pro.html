@@ -1,0 +1,2005 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CPN Tool — Professional Colored Petri Net Editor</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════
+   CSS CUSTOM PROPERTIES
+═══════════════════════════════════════════════ */
+:root {
+  --bg:        #07101e;
+  --bg2:       #09162a;
+  --bg3:       #0d1f38;
+  --bg4:       #050d18;
+  --border:    #0e2540;
+  --border2:   #183860;
+  --place:     #1d4ed8;
+  --place-hi:  #3b82f6;
+  --place-fill:#060f1e;
+  --trans:     #15803d;
+  --trans-hi:  #22c55e;
+  --trans-fill:#060f10;
+  --enabled:   #60a5fa;
+  --firing:    #86efac;
+  --arc-col:   #1a3554;
+  --arc-en:    #2563eb;
+  --token:     #f59e0b;
+  --token-bg:  #1a1000;
+  --cs-col:    #ea580c;
+  --guard-col: #7c3aed;
+  --text:      #6b8fae;
+  --text2:     #2d5070;
+  --text3:     #1a3050;
+  --red:       #dc2626;
+  --amber:     #d97706;
+  --green:     #16a34a;
+  --mono:      'IBM Plex Mono', monospace;
+  --sans:      'Instrument Sans', sans-serif;
+  --panel-w:   220px;
+  --right-w:   260px;
+  --topbar-h:  44px;
+  --statusbar-h: 24px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; background: var(--bg); }
+body { font-family: var(--mono); color: var(--text); display: flex; flex-direction: column; }
+button { cursor: pointer; font-family: var(--mono); }
+input, textarea, select { font-family: var(--mono); color: var(--text); background: var(--bg3); }
+:focus { outline: none; }
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* ═══════════════════════════════════════════════
+   TOP BAR
+═══════════════════════════════════════════════ */
+#topbar {
+  height: var(--topbar-h);
+  background: var(--bg4);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  z-index: 200;
+  user-select: none;
+}
+#logo {
+  padding: 0 16px;
+  border-right: 1px solid var(--border);
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.logo-cpn  { font-size: 16px; font-weight: 700; color: var(--place-hi); letter-spacing: -1px; }
+.logo-tool { font-size: 9px; color: var(--text3); letter-spacing: 3px; margin-top: 1px; }
+
+/* Mode tabs */
+#mode-tabs { display: flex; height: 100%; border-right: 1px solid var(--border); }
+.mode-tab {
+  padding: 0 16px; height: 100%; border: none; background: transparent;
+  color: var(--text3); font-size: 9px; letter-spacing: 2px; text-transform: uppercase;
+  border-bottom: 2px solid transparent; transition: all 0.12s;
+}
+.mode-tab:hover { color: var(--text); }
+.mode-tab.active { color: var(--enabled); border-bottom-color: var(--place); }
+
+/* Sim controls */
+#sim-controls {
+  display: flex; align-items: center; gap: 5px;
+  padding: 0 14px; border-right: 1px solid var(--border); height: 100%;
+}
+.sim-btn {
+  padding: 4px 12px; font-size: 10px; letter-spacing: 0.5px;
+  border-radius: 3px; border: 1px solid var(--border2);
+  background: transparent; color: var(--text2); transition: all 0.12s;
+}
+.sim-btn:hover:not(:disabled) { border-color: var(--trans-hi); color: var(--firing); background: var(--trans-fill); }
+.sim-btn:disabled { opacity: 0.25; cursor: default; }
+.sim-btn.go { border-color: var(--trans); color: #4ade80; background: var(--trans-fill); }
+.sim-btn.go:hover:not(:disabled) { background: #081a0a; }
+#step-badge {
+  font-size: 9px; color: var(--text3); letter-spacing: 1px;
+  padding: 0 6px; border-left: 1px solid var(--border); margin-left: 2px;
+}
+#deadlock-badge {
+  font-size: 9px; color: var(--red); letter-spacing: 1.5px;
+  padding: 2px 7px; border: 1px solid #7f1d1d; border-radius: 2px; display: none;
+}
+
+/* Analysis button */
+#analyse-btn {
+  margin-left: 4px;
+  padding: 4px 12px; font-size: 9px; letter-spacing: 1.5px;
+  border-radius: 3px; border: 1px solid var(--border2);
+  background: transparent; color: var(--text3); text-transform: uppercase;
+  transition: all 0.12s;
+}
+#analyse-btn:hover { border-color: var(--place-hi); color: var(--enabled); }
+#analyse-btn.running { color: var(--amber); border-color: var(--amber); }
+
+/* Right section */
+#topbar-right {
+  display: flex; align-items: center; gap: 5px;
+  padding: 0 12px; margin-left: auto; border-left: 1px solid var(--border); height: 100%;
+}
+.export-btn {
+  padding: 3px 9px; font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase;
+  border-radius: 3px; border: 1px solid var(--border); background: transparent;
+  color: var(--text3); transition: all 0.12s;
+}
+.export-btn:hover { border-color: var(--border2); color: var(--text); }
+.sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
+
+/* ═══════════════════════════════════════════════
+   MAIN LAYOUT
+═══════════════════════════════════════════════ */
+#main { flex: 1; display: flex; overflow: hidden; }
+
+/* ═══════════════════════════════════════════════
+   LEFT PANEL
+═══════════════════════════════════════════════ */
+#left-panel {
+  width: var(--panel-w); flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  background: var(--bg4); overflow: hidden;
+}
+.panel-hdr {
+  padding: 5px 10px; font-size: 8px; letter-spacing: 2.5px;
+  text-transform: uppercase; color: var(--text3);
+  border-bottom: 1px solid var(--border); background: var(--bg);
+  flex-shrink: 0;
+}
+/* Tool palette */
+#tool-palette { padding: 8px; display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
+.tool-btn {
+  padding: 6px 10px; border: 1px solid var(--border);
+  border-radius: 4px; background: transparent; color: var(--text2);
+  font-size: 10px; text-align: left; display: flex; align-items: center;
+  gap: 8px; transition: all 0.1s;
+}
+.tool-btn:hover { background: var(--bg3); color: var(--text); border-color: var(--border2); }
+.tool-btn.active { border-color: var(--place); color: var(--enabled); background: #060f1e; }
+.tool-icon { font-size: 13px; width: 16px; text-align: center; opacity: 0.7; }
+.tool-key {
+  margin-left: auto; font-size: 8px; color: var(--text3);
+  background: var(--bg3); padding: 1px 4px; border-radius: 2px; letter-spacing: 0;
+}
+
+/* Examples */
+#examples-list { padding: 6px 8px; display: flex; flex-direction: column; gap: 3px; flex-shrink: 0; }
+.ex-btn {
+  padding: 4px 8px; border: 1px solid var(--border); border-radius: 3px;
+  background: transparent; color: var(--text3); font-size: 9px;
+  text-align: left; transition: all 0.1s;
+}
+.ex-btn:hover { border-color: var(--border2); color: var(--text); }
+
+/* Properties */
+#props-scroll { flex: 1; overflow-y: auto; }
+#props-inner { padding: 8px; }
+.prop-row { margin-bottom: 10px; }
+.prop-lbl { font-size: 8px; color: var(--text3); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 3px; }
+.prop-inp {
+  width: 100%; background: var(--bg3); border: 1px solid var(--border2);
+  border-radius: 3px; color: var(--text); font-size: 11px; padding: 4px 7px;
+}
+.prop-inp:focus { border-color: var(--place-hi); }
+.prop-toks {
+  font-size: 10px; color: var(--token); padding: 4px 7px;
+  background: var(--token-bg); border: 1px solid var(--border);
+  border-radius: 3px; min-height: 26px; word-break: break-all; line-height: 1.5;
+}
+.no-sel { font-size: 10px; color: var(--text3); padding: 8px 0; font-style: italic; }
+
+/* Marking panel */
+#marking-panel { padding: 6px 8px; flex-shrink: 0; border-top: 1px solid var(--border); }
+.mark-row { display: flex; justify-content: space-between; font-size: 10px; padding: 2px 0; }
+.mark-name { color: var(--text2); }
+.mark-val { color: var(--token); font-weight: 600; }
+
+/* ═══════════════════════════════════════════════
+   CANVAS
+═══════════════════════════════════════════════ */
+#center { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+
+#canvas-wrap {
+  flex: 1; position: relative; overflow: hidden;
+  background: var(--bg); cursor: default;
+}
+#canvas-wrap.mode-text { display: none; }
+
+/* Dot grid */
+#canvas-wrap::before {
+  content: ''; position: absolute; inset: 0;
+  background-image: radial-gradient(circle, #0e2540 1px, transparent 1px);
+  background-size: 24px 24px; pointer-events: none; z-index: 0;
+}
+
+#cpn-svg {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%; overflow: visible;
+}
+#cpn-svg.panning { cursor: grabbing; }
+#cpn-svg.tool-place,
+#cpn-svg.tool-transition,
+#cpn-svg.tool-arc { cursor: crosshair; }
+#cpn-svg.tool-delete { cursor: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16'><text y='14' font-size='14'>✕</text></svg>") 8 8, crosshair; }
+
+/* Canvas SVG element styles */
+.place-outer { fill: none; }
+.place-body { fill: var(--place-fill); stroke: var(--place); stroke-width: 1.8; }
+.place-body.sel { stroke: #e2e8f0; stroke-width: 2.5; }
+.place-body.en  { stroke: var(--enabled); stroke-width: 2.5; }
+.place-body.fir { stroke: var(--firing);  stroke-width: 3; }
+.place-ring { fill: none; stroke: var(--cs-col); stroke-width: 0.7; stroke-dasharray: 3 2.5; opacity: 0.5; }
+.place-lbl  { font-size: 11px; font-weight: 700; fill: #7fb3d3; font-family: 'IBM Plex Mono', monospace; }
+.place-cs   { font-size: 8px;  fill: var(--cs-col); font-family: 'IBM Plex Mono', monospace; opacity: 0.8; }
+.tok-dot    { fill: var(--token-bg); stroke: var(--token); stroke-width: 1.2; }
+.tok-lbl    { fill: var(--token); font-size: 6px; font-family: monospace; }
+.empty-mark { fill: #1a3050; font-size: 9px; font-family: monospace; }
+
+.trans-body { fill: var(--trans-fill); stroke: var(--trans); stroke-width: 1.8; }
+.trans-body.sel { stroke: #e2e8f0; stroke-width: 2.5; }
+.trans-body.en  { stroke: var(--trans-hi); stroke-width: 2.5; }
+.trans-body.fir { stroke: var(--firing);   stroke-width: 3; }
+.trans-lbl  { font-size: 11px; font-weight: 700; fill: #6aab7a; font-family: 'IBM Plex Mono', monospace; }
+.trans-guard{ font-size: 8px;  fill: #7c3aed; font-family: 'IBM Plex Mono', monospace; opacity: 0.85; }
+
+.arc-path { fill: none; stroke: var(--arc-col); stroke-width: 1.3; }
+.arc-path.en { stroke: var(--arc-en); stroke-width: 1.8; }
+.arc-glow { fill: none; stroke: #3b82f6; stroke-width: 5; opacity: 0.12; }
+.arc-lbl-bg { fill: var(--bg4); }
+.arc-lbl-txt { font-size: 10px; font-family: 'IBM Plex Mono', monospace; font-style: italic; }
+.arc-preview { fill: none; stroke: #3b82f650; stroke-width: 1.5; stroke-dasharray: 5 4; }
+
+/* ═══════════════════════════════════════════════
+   TEXT EDITOR
+═══════════════════════════════════════════════ */
+#editor-wrap {
+  flex: 1; display: none; flex-direction: column; overflow: hidden;
+}
+#editor-wrap.mode-text { display: flex; }
+#editor-toolbar {
+  padding: 5px 12px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+  background: var(--bg4); font-size: 9px; color: var(--text3); flex-shrink: 0;
+}
+.status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 5px var(--green); }
+.status-dot.err { background: var(--red); box-shadow: 0 0 5px var(--red); }
+#editor-cols { flex: 1; display: flex; overflow: hidden; }
+#line-nums {
+  width: 42px; background: #040c16; border-right: 1px solid var(--border);
+  padding: 11px 0; font-size: 11.5px; line-height: 1.7;
+  color: var(--text3); text-align: right; padding-right: 8px;
+  overflow: hidden; flex-shrink: 0; user-select: none;
+}
+#hl-wrap { flex: 1; position: relative; overflow: auto; }
+#hl-overlay {
+  position: absolute; inset: 0; padding: 11px 13px;
+  font-size: 11.5px; line-height: 1.7; font-family: var(--mono);
+  white-space: pre; pointer-events: none; overflow: hidden;
+}
+#cpn-editor {
+  position: absolute; inset: 0;
+  background: transparent; border: none; resize: none;
+  color: rgba(255,255,255,0.06); caret-color: var(--enabled);
+  padding: 11px 13px; font-size: 11.5px; line-height: 1.7;
+  font-family: var(--mono); white-space: pre; overflow: auto; width: 100%; height: 100%;
+}
+#err-bar { background:#0f0404; border-top: 1px solid #3f0a0a; padding: 5px 12px; font-size: 10px; color: var(--red); display: none; flex-shrink: 0; }
+.hl-kw  { color: #7dd3fc; }
+.hl-nm  { color: #fde68a; }
+.hl-cs  { color: #fb923c; }
+.hl-ex  { color: #86efac; }
+.hl-gd  { color: #c4b5fd; }
+.hl-tk  { color: #fbbf24; }
+.hl-pt  { color: #2a5580; }
+.hl-cm  { color: #1e3555; font-style: italic; }
+
+/* ═══════════════════════════════════════════════
+   RIGHT PANEL
+═══════════════════════════════════════════════ */
+#right-panel {
+  width: var(--right-w); flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  background: var(--bg4);
+}
+/* Tab bar */
+#right-tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.right-tab {
+  flex: 1; padding: 6px 0; font-size: 9px; letter-spacing: 1.5px;
+  text-transform: uppercase; border: none; background: transparent;
+  color: var(--text3); border-bottom: 2px solid transparent; transition: all 0.1s;
+}
+.right-tab:hover { color: var(--text); }
+.right-tab.active { color: var(--enabled); border-bottom-color: var(--place); }
+
+/* Log tab */
+#log-pane { flex: 1; overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
+.log-entry {
+  padding: 2px 7px; border-radius: 2px; font-size: 10px; line-height: 1.5;
+  border-left: 2px solid var(--border); color: var(--text3);
+}
+.log-entry.fire   { border-color: var(--trans-hi); color: #4ade80; }
+.log-entry.system { border-color: var(--place); color: #60a5fa; }
+.log-entry.warn   { border-color: var(--amber); color: var(--amber); }
+.log-entry.error  { border-color: var(--red); color: var(--red); }
+.log-num { color: var(--text3); margin-right: 5px; }
+
+/* Enabled pane */
+#enabled-pane { border-top: 1px solid var(--border); padding: 8px; flex-shrink: 0; }
+#enabled-list { display: flex; flex-direction: column; gap: 3px; margin-top: 5px; }
+.en-btn {
+  padding: 5px 8px; border: 1px solid var(--trans); border-radius: 3px;
+  background: var(--trans-fill); color: #4ade80; font-size: 9px; text-align: left; transition: all 0.1s;
+}
+.en-btn:hover { background: #081a0a; }
+.en-bind { color: #1a5c2a; display: block; font-size: 8px; margin-top: 1px; }
+
+/* Analysis pane */
+#analysis-pane { display: none; flex: 1; overflow-y: auto; padding: 8px; }
+#analysis-pane.active { display: block; }
+.analysis-section { margin-bottom: 14px; }
+.analysis-title { font-size: 9px; letter-spacing: 2px; color: var(--text3); text-transform: uppercase; margin-bottom: 6px; border-bottom: 1px solid var(--border); padding-bottom: 3px; }
+.analysis-stat { display: flex; justify-content: space-between; font-size: 10px; padding: 2px 0; }
+.analysis-key { color: var(--text2); }
+.analysis-val { font-weight: 600; }
+.analysis-val.good { color: var(--trans-hi); }
+.analysis-val.warn { color: var(--amber); }
+.analysis-val.bad  { color: var(--red); }
+.analysis-badge {
+  display: inline-block; padding: 1px 6px; border-radius: 2px;
+  font-size: 8px; letter-spacing: 1px; text-transform: uppercase;
+}
+.badge-live { background: #052010; color: var(--trans-hi); border: 1px solid var(--trans); }
+.badge-dead { background: #200505; color: var(--red); border: 1px solid var(--red); }
+.badge-bounded { background: #051020; color: var(--enabled); border: 1px solid var(--place); }
+#reachability-section { margin-top: 8px; }
+#reach-input {
+  width: 100%; background: var(--bg3); border: 1px solid var(--border2);
+  border-radius: 3px; color: var(--text); font-size: 10px; padding: 4px 7px;
+  margin-bottom: 5px;
+}
+#reach-btn {
+  width: 100%; padding: 5px; font-size: 9px; letter-spacing: 1px;
+  border: 1px solid var(--border2); border-radius: 3px;
+  background: transparent; color: var(--text2); transition: all 0.1s;
+}
+#reach-btn:hover { border-color: var(--place-hi); color: var(--enabled); }
+#reach-result { font-size: 10px; margin-top: 6px; padding: 5px 7px; border-radius: 3px; display: none; }
+#reach-result.yes { background: #051508; color: var(--trans-hi); border: 1px solid var(--trans); }
+#reach-result.no  { background: #150505; color: var(--red); border: 1px solid var(--red); }
+#no-analysis { font-size: 10px; color: var(--text3); font-style: italic; padding: 4px 0; }
+
+/* ═══════════════════════════════════════════════
+   STATUS BAR
+═══════════════════════════════════════════════ */
+#statusbar {
+  height: var(--statusbar-h); background: var(--bg4);
+  border-top: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 14px;
+  font-size: 9px; color: var(--text3); gap: 20px;
+  flex-shrink: 0; user-select: none;
+}
+.sb-item { display: flex; gap: 5px; }
+.sb-val { color: var(--text2); }
+#sb-cursor { margin-left: auto; }
+
+/* ═══════════════════════════════════════════════
+   MODAL (Arc edit + Help)
+═══════════════════════════════════════════════ */
+#overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+  z-index: 500; display: none; align-items: center; justify-content: center;
+}
+#overlay.open { display: flex; }
+.modal {
+  background: var(--bg2); border: 1px solid var(--border2);
+  border-radius: 6px; padding: 22px; width: 420px; max-width: 90vw;
+}
+.modal h3 { font-size: 12px; color: var(--text); margin-bottom: 14px; letter-spacing: 1px; }
+.modal-row { margin-bottom: 10px; }
+.modal-lbl { font-size: 8px; color: var(--text3); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 3px; }
+.modal-inp {
+  width: 100%; background: var(--bg3); border: 1px solid var(--border2);
+  border-radius: 3px; color: var(--text); font-size: 12px; padding: 6px 9px;
+}
+.modal-inp:focus { border-color: var(--place-hi); }
+.modal-btns { display: flex; gap: 7px; justify-content: flex-end; margin-top: 16px; }
+.modal-btn { padding: 5px 16px; font-size: 10px; letter-spacing: 0.5px; border-radius: 3px; border: 1px solid var(--border2); background: transparent; color: var(--text2); transition: all 0.1s; }
+.modal-btn.ok { border-color: var(--place); color: var(--enabled); background: var(--place-fill); }
+.modal-btn:hover { opacity: 0.8; }
+
+/* Help overlay */
+#help-modal { width: 500px; }
+.help-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
+.help-row { display: flex; justify-content: space-between; font-size: 10px; padding: 2px 0; }
+.help-key { color: var(--enabled); background: var(--bg3); padding: 1px 5px; border-radius: 2px; font-size: 9px; margin-right: 6px; }
+.help-desc { color: var(--text2); }
+
+/* Context menu */
+#ctx-menu {
+  position: fixed; background: var(--bg2); border: 1px solid var(--border2);
+  border-radius: 4px; padding: 4px 0; z-index: 400; display: none;
+  min-width: 140px;
+}
+.ctx-item {
+  padding: 5px 14px; font-size: 10px; color: var(--text2); cursor: pointer;
+  transition: all 0.1s;
+}
+.ctx-item:hover { background: var(--bg3); color: var(--text); }
+.ctx-sep { height: 1px; background: var(--border); margin: 3px 0; }
+.ctx-item.danger { color: var(--red); }
+
+/* ═══════════════════════════════════════════════
+   TOOLTIP
+═══════════════════════════════════════════════ */
+#tooltip {
+  position: fixed; background: var(--bg2); border: 1px solid var(--border2);
+  border-radius: 3px; padding: 4px 9px; font-size: 10px; color: var(--text);
+  pointer-events: none; z-index: 600; display: none; white-space: nowrap;
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div id="logo"><span class="logo-cpn">cpn</span><span class="logo-tool">TOOL</span></div>
+
+  <div id="mode-tabs">
+    <button class="mode-tab active" data-mode="visual">◈ Visual</button>
+    <button class="mode-tab" data-mode="text">⌨ Text</button>
+  </div>
+
+  <div id="sim-controls">
+    <button class="sim-btn go" id="btn-step" title="Space">▶ Step</button>
+    <button class="sim-btn" id="btn-play" title="P">⏵ Play</button>
+    <button class="sim-btn" id="btn-reset" title="R">↺ Reset</button>
+    <div id="step-badge">STEP <span id="step-num">0</span></div>
+    <div id="deadlock-badge">◼ DEADLOCK</div>
+    <button id="analyse-btn">⊞ Analyse</button>
+  </div>
+
+  <div id="topbar-right">
+    <button class="export-btn" id="btn-svg">SVG</button>
+    <button class="export-btn" id="btn-png">PNG</button>
+    <button class="export-btn" id="btn-pnml">PNML</button>
+    <button class="export-btn" id="btn-cpn">.cpn</button>
+    <div class="sep"></div>
+    <button class="export-btn" id="btn-import">Import</button>
+    <button class="export-btn" id="btn-help" title="?">?</button>
+    <input type="file" id="file-inp" accept=".cpn,.txt,.pnml" style="display:none">
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+
+  <!-- LEFT -->
+  <div id="left-panel">
+    <div class="panel-hdr">Tools</div>
+    <div id="tool-palette">
+      <button class="tool-btn active" data-tool="select"><span class="tool-icon">↖</span>Select / Move<span class="tool-key">S</span></button>
+      <button class="tool-btn" data-tool="place"><span class="tool-icon">◉</span>Add Place<span class="tool-key">P</span></button>
+      <button class="tool-btn" data-tool="transition"><span class="tool-icon">▬</span>Add Transition<span class="tool-key">T</span></button>
+      <button class="tool-btn" data-tool="arc"><span class="tool-icon">→</span>Draw Arc<span class="tool-key">A</span></button>
+      <button class="tool-btn" data-tool="delete"><span class="tool-icon">✕</span>Delete<span class="tool-key">D</span></button>
+    </div>
+
+    <div class="panel-hdr" style="margin-top:2px">Examples</div>
+    <div id="examples-list">
+      <button class="ex-btn" data-ex="producer">Producer-Consumer</button>
+      <button class="ex-btn" data-ex="philosophers">Dining Philosophers</button>
+      <button class="ex-btn" data-ex="pipeline">Token Pipeline</button>
+      <button class="ex-btn" data-ex="mutex">Mutual Exclusion</button>
+    </div>
+
+    <div class="panel-hdr" style="margin-top:2px">Properties</div>
+    <div id="props-scroll">
+      <div id="props-inner">
+        <div class="no-sel" id="no-sel">Select a node to edit</div>
+        <div id="props-form" style="display:none">
+          <div class="prop-row">
+            <div class="prop-lbl">Name</div>
+            <input class="prop-inp" id="p-name" type="text">
+          </div>
+          <div class="prop-row" id="pg-cs">
+            <div class="prop-lbl">Color Set</div>
+            <input class="prop-inp" id="p-cs" type="text" placeholder="e.g. JOBS">
+          </div>
+          <div class="prop-row" id="pg-init">
+            <div class="prop-lbl">Initial Tokens</div>
+            <input class="prop-inp" id="p-init" type="text" placeholder="e.g. job1, job2">
+          </div>
+          <div class="prop-row" id="pg-toks">
+            <div class="prop-lbl">Current Tokens</div>
+            <div class="prop-toks" id="p-toks">∅</div>
+          </div>
+          <div class="prop-row" id="pg-guard" style="display:none">
+            <div class="prop-lbl">Guard</div>
+            <input class="prop-inp" id="p-guard" type="text" placeholder="e.g. x in JOBS">
+          </div>
+          <div class="prop-row" id="pg-snap">
+            <div class="prop-lbl">Grid Snap</div>
+            <label style="font-size:10px;color:var(--text2);display:flex;align-items:center;gap:6px">
+              <input type="checkbox" id="snap-chk" checked> Snap to 24px grid
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-hdr">Marking</div>
+    <div id="marking-panel"></div>
+  </div>
+
+  <!-- CENTER -->
+  <div id="center">
+    <!-- Canvas -->
+    <div id="canvas-wrap">
+      <svg id="cpn-svg" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arr"    markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L0,8 L10,4 z" fill="#1a3554"/></marker>
+          <marker id="arr-en" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L0,8 L10,4 z" fill="#2563eb"/></marker>
+          <marker id="arr-pr" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L0,8 L10,4 z" fill="#3b82f650"/></marker>
+          <filter id="glow-sm" x="-40%" y="-40%" width="180%" height="180%">
+            <feGaussianBlur stdDeviation="3" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <filter id="glow-lg" x="-60%" y="-60%" width="220%" height="220%">
+            <feGaussianBlur stdDeviation="7" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <g id="cv-root" transform="translate(0,0) scale(1)">
+          <g id="cv-arcs"></g>
+          <g id="cv-nodes"></g>
+          <g id="cv-preview"></g>
+        </g>
+      </svg>
+    </div>
+
+    <!-- Text editor -->
+    <div id="editor-wrap">
+      <div id="editor-toolbar">
+        <span style="letter-spacing:2px">CPN SOURCE</span>
+        <span style="color:var(--border2)">|</span>
+        <span>Tab=indent · Ctrl+Enter=apply</span>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:6px">
+          <div class="status-dot" id="dot"></div>
+          <span id="dot-txt" style="font-size:9px">OK</span>
+        </div>
+      </div>
+      <div id="editor-cols">
+        <div id="line-nums"></div>
+        <div id="hl-wrap">
+          <div id="hl-overlay"></div>
+          <textarea id="cpn-editor" spellcheck="false"></textarea>
+        </div>
+      </div>
+      <div id="err-bar"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div id="right-panel">
+    <div id="right-tabs">
+      <button class="right-tab active" data-tab="log">Log</button>
+      <button class="right-tab" data-tab="analysis">Analysis</button>
+    </div>
+
+    <!-- Log pane -->
+    <div id="log-pane"></div>
+    <div id="enabled-pane">
+      <div style="font-size:8px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin-bottom:5px">Enabled</div>
+      <div id="enabled-list"></div>
+    </div>
+
+    <!-- Analysis pane -->
+    <div id="analysis-pane">
+      <div id="no-analysis">Run analysis to see results.<br>Click ⊞ Analyse in the toolbar.</div>
+      <div id="analysis-results" style="display:none">
+        <div class="analysis-section">
+          <div class="analysis-title">State Space</div>
+          <div id="ss-stats"></div>
+        </div>
+        <div class="analysis-section">
+          <div class="analysis-title">Boundedness</div>
+          <div id="ss-bounds"></div>
+        </div>
+        <div class="analysis-section">
+          <div class="analysis-title">Liveness</div>
+          <div id="ss-live"></div>
+        </div>
+        <div class="analysis-section">
+          <div class="analysis-title">Reachability Query</div>
+          <div style="font-size:9px;color:var(--text3);margin-bottom:5px">Enter target marking as JSON: {"PlaceId":["tok1"]}</div>
+          <input id="reach-input" class="prop-inp" placeholder='{"Done":["job1"]}'>
+          <button id="reach-btn" style="margin-top:5px;width:100%;padding:5px;font-size:9px;border:1px solid var(--border2);border-radius:3px;background:transparent;color:var(--text2);cursor:pointer">Check Reachability</button>
+          <div id="reach-result"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- STATUS BAR -->
+<div id="statusbar">
+  <div class="sb-item"><span>P:</span><span class="sb-val" id="sb-p">0</span></div>
+  <div class="sb-item"><span>T:</span><span class="sb-val" id="sb-t">0</span></div>
+  <div class="sb-item"><span>A:</span><span class="sb-val" id="sb-a">0</span></div>
+  <div class="sb-item"><span>Tokens:</span><span class="sb-val" id="sb-tok">0</span></div>
+  <div class="sb-item"><span>Zoom:</span><span class="sb-val" id="sb-zoom">100%</span></div>
+  <div class="sb-item" id="sb-snap"><span>Snap:</span><span class="sb-val">ON</span></div>
+  <div class="sb-item" id="sb-cursor">x:0 y:0</div>
+</div>
+
+<!-- MODAL OVERLAY -->
+<div id="overlay">
+  <div class="modal" id="arc-modal">
+    <h3>Arc Expression</h3>
+    <div class="modal-row">
+      <div class="modal-lbl">Expression</div>
+      <input class="modal-inp" id="m-arc-expr" placeholder="e.g.  x  or  (x,y)">
+    </div>
+    <div class="modal-row">
+      <div class="modal-lbl">Notes</div>
+      <div style="font-size:9px;color:var(--text3);line-height:1.6">
+        Single variable: <span style="color:var(--trans-hi)">x</span><br>
+        Tuple: <span style="color:var(--trans-hi)">(x,y)</span><br>
+        Literal token: <span style="color:var(--trans-hi)">job1</span>
+      </div>
+    </div>
+    <div class="modal-btns">
+      <button class="modal-btn" id="m-cancel">Cancel</button>
+      <button class="modal-btn ok" id="m-ok">Apply</button>
+    </div>
+  </div>
+  <div class="modal" id="help-modal" style="display:none;width:500px">
+    <h3>Keyboard Shortcuts</h3>
+    <div class="help-grid">
+      <div class="help-row"><span><span class="help-key">S</span><span class="help-desc">Select / move</span></span></div>
+      <div class="help-row"><span><span class="help-key">P</span><span class="help-desc">Add place</span></span></div>
+      <div class="help-row"><span><span class="help-key">T</span><span class="help-desc">Add transition</span></span></div>
+      <div class="help-row"><span><span class="help-key">A</span><span class="help-desc">Draw arc</span></span></div>
+      <div class="help-row"><span><span class="help-key">D</span><span class="help-desc">Delete tool</span></span></div>
+      <div class="help-row"><span><span class="help-key">Space</span><span class="help-desc">Simulation step</span></span></div>
+      <div class="help-row"><span><span class="help-key">R</span><span class="help-desc">Reset simulation</span></span></div>
+      <div class="help-row"><span><span class="help-key">G</span><span class="help-desc">Toggle grid snap</span></span></div>
+      <div class="help-row"><span><span class="help-key">F</span><span class="help-desc">Fit to screen</span></span></div>
+      <div class="help-row"><span><span class="help-key">+/-</span><span class="help-desc">Zoom in/out</span></span></div>
+      <div class="help-row"><span><span class="help-key">Ctrl+Z</span><span class="help-desc">Undo</span></span></div>
+      <div class="help-row"><span><span class="help-key">Ctrl+Y</span><span class="help-desc">Redo</span></span></div>
+      <div class="help-row"><span><span class="help-key">Del</span><span class="help-desc">Delete selected</span></span></div>
+      <div class="help-row"><span><span class="help-key">Esc</span><span class="help-desc">Cancel / deselect</span></span></div>
+      <div class="help-row"><span><span class="help-key">Scroll</span><span class="help-desc">Zoom canvas</span></span></div>
+      <div class="help-row"><span><span class="help-key">Mid drag</span><span class="help-desc">Pan canvas</span></span></div>
+      <div class="help-row"><span><span class="help-key">Dbl-click T</span><span class="help-desc">Fire transition</span></span></div>
+      <div class="help-row"><span><span class="help-key">Dbl-click arc</span><span class="help-desc">Edit expression</span></span></div>
+      <div class="help-row"><span><span class="help-key">Right-click</span><span class="help-desc">Context menu</span></span></div>
+      <div class="help-row"><span><span class="help-key">?</span><span class="help-desc">This help</span></span></div>
+    </div>
+    <div class="modal-btns"><button class="modal-btn ok" id="help-close">Close</button></div>
+  </div>
+</div>
+
+<!-- CONTEXT MENU -->
+<div id="ctx-menu">
+  <div class="ctx-item" id="ctx-fire">▶ Fire Transition</div>
+  <div class="ctx-item" id="ctx-edit">✎ Edit Properties</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item danger" id="ctx-del">✕ Delete</div>
+</div>
+
+<!-- TOOLTIP -->
+<div id="tooltip"></div>
+
+<script>
+'use strict';
+// ═══════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════
+const PLACE_R = 46, TW = 90, TH = 40, GRID = 24;
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+// ═══════════════════════════════════════════════════════════
+// APPLICATION STATE
+// ═══════════════════════════════════════════════════════════
+const S = {
+  places: [], transitions: [], arcs: [], colorsets: {},
+  selected: null,
+  tool: 'select',
+  mode: 'visual',
+  snap: true,
+  // Canvas transform
+  tx: 0, ty: 0, scale: 1,
+  // Arc drawing
+  arcSrc: null,
+  // Simulation
+  simStep: 0, playing: false, playTimer: null,
+  // Undo/redo
+  history: [], histIdx: -1,
+  // Counters
+  nc: 0, ac: 0,
+  // Analysis
+  stateSpace: null,
+  // Log
+  log: [],
+  // Context menu target
+  ctxTarget: null,
+};
+
+// ═══════════════════════════════════════════════════════════
+// EXAMPLES
+// ═══════════════════════════════════════════════════════════
+const EXAMPLES = {
+producer:`// Producer-Consumer CPN
+colorset JOBS = {job1, job2, job3}
+colorset WORKERS = {w1, w2}
+
+place Ready    : JOBS    = {job1, job2, job3}
+place Idle     : WORKERS = {w1, w2}
+place Busy     : JOBS*WORKERS = {}
+place Done     : JOBS    = {}
+
+transition Assign   [guard: j in JOBS, w in WORKERS]
+transition Complete [guard: true]
+
+arc Ready    --> Assign   : j
+arc Idle     --> Assign   : w
+arc Assign   --> Busy     : (j,w)
+arc Busy     --> Complete : (j,w)
+arc Complete --> Done     : j
+arc Complete --> Idle     : w`,
+
+philosophers:`// Dining Philosophers
+colorset PHIL = {p1, p2}
+colorset FORK = {f1, f2}
+
+place Thinking : PHIL      = {p1, p2}
+place Eating   : PHIL*FORK = {}
+place Forks    : FORK      = {f1, f2}
+
+transition PickUp  [guard: p in PHIL, f in FORK]
+transition PutDown [guard: true]
+
+arc Thinking --> PickUp  : p
+arc Forks    --> PickUp  : f
+arc PickUp   --> Eating  : (p,f)
+arc Eating   --> PutDown : (p,f)
+arc PutDown  --> Thinking: p
+arc PutDown  --> Forks   : f`,
+
+pipeline:`// Token Pipeline
+colorset DATA = {a, b, c}
+
+place Input   : DATA = {a, b, c}
+place Buffer  : DATA = {}
+place Output  : DATA = {}
+
+transition Push [guard: true]
+transition Pop  [guard: true]
+
+arc Input  --> Push   : x
+arc Push   --> Buffer : x
+arc Buffer --> Pop    : x
+arc Pop    --> Output : x`,
+
+mutex:`// Mutual Exclusion
+colorset PROC = {p1, p2}
+colorset SEM  = {s}
+
+place Ready     : PROC = {p1, p2}
+place Critical  : PROC = {}
+place Done      : PROC = {}
+place Semaphore : SEM  = {s}
+
+transition Enter [guard: p in PROC]
+transition Exit  [guard: true]
+
+arc Ready     --> Enter     : p
+arc Semaphore --> Enter     : s
+arc Enter     --> Critical  : p
+arc Critical  --> Exit      : p
+arc Exit      --> Done      : p
+arc Exit      --> Semaphore : s`,
+};
+
+// ═══════════════════════════════════════════════════════════
+// UNDO / REDO — Command Pattern
+// ═══════════════════════════════════════════════════════════
+function execCmd(cmd) {
+  cmd.do();
+  S.history.splice(S.histIdx + 1);
+  S.history.push(cmd);
+  S.histIdx = S.history.length - 1;
+  render();
+}
+function undo() {
+  if (S.histIdx < 0) return;
+  S.history[S.histIdx].undo();
+  S.histIdx--;
+  render();
+}
+function redo() {
+  if (S.histIdx >= S.history.length - 1) return;
+  S.histIdx++;
+  S.history[S.histIdx].do();
+  render();
+}
+
+const Cmd = {
+  addPlace(x, y) {
+    const id = 'P' + (++S.nc);
+    const node = { id, x, y, label: id, colorSet: 'TOKEN', initTokens: [], tokens: [] };
+    return {
+      do()   { S.places.push(node); S.selected = { type:'place', id }; },
+      undo() { S.places = S.places.filter(p => p.id !== id); S.arcs = S.arcs.filter(a => a.src !== id && a.tgt !== id); if (S.selected?.id === id) S.selected = null; },
+    };
+  },
+  addTransition(x, y) {
+    const id = 'T' + (++S.nc);
+    const node = { id, x, y, label: id, guard: 'true' };
+    return {
+      do()   { S.transitions.push(node); S.selected = { type:'transition', id }; },
+      undo() { S.transitions = S.transitions.filter(t => t.id !== id); S.arcs = S.arcs.filter(a => a.src !== id && a.tgt !== id); if (S.selected?.id === id) S.selected = null; },
+    };
+  },
+  addArc(srcId, tgtId, expr) {
+    const arc = { id: 'arc' + (++S.ac), src: srcId, tgt: tgtId, expr: expr || 'x' };
+    return {
+      do()   { S.arcs.push(arc); },
+      undo() { S.arcs = S.arcs.filter(a => a.id !== arc.id); },
+    };
+  },
+  deleteNode(type, id) {
+    const node = findNode(id);
+    const removedArcs = S.arcs.filter(a => a.src === id || a.tgt === id);
+    return {
+      do() {
+        if (type === 'place') S.places = S.places.filter(p => p.id !== id);
+        else S.transitions = S.transitions.filter(t => t.id !== id);
+        S.arcs = S.arcs.filter(a => a.src !== id && a.tgt !== id);
+        if (S.selected?.id === id) S.selected = null;
+      },
+      undo() {
+        if (type === 'place') S.places.push(node);
+        else S.transitions.push(node);
+        removedArcs.forEach(a => S.arcs.push(a));
+      },
+    };
+  },
+  moveNode(id, fromX, fromY, toX, toY) {
+    const node = findNode(id);
+    if (!node) return { do(){}, undo(){} };
+    return {
+      do()   { node.x = toX; node.y = toY; },
+      undo() { node.x = fromX; node.y = fromY; },
+    };
+  },
+  editProp(id, field, oldVal, newVal) {
+    const node = findNode(id);
+    if (!node) return { do(){}, undo(){} };
+    return {
+      do()   { node[field] = newVal; if (field === 'initTokens') node.tokens = [...newVal]; },
+      undo() { node[field] = oldVal; if (field === 'initTokens') node.tokens = [...oldVal]; },
+    };
+  },
+};
+
+// ═══════════════════════════════════════════════════════════
+// PARSER
+// ═══════════════════════════════════════════════════════════
+function parseCPN(src) {
+  const cs = {}, places = [], transitions = [], arcs = [], errors = [];
+  src.split('\n').forEach((raw, i) => {
+    const line = raw.trim();
+    if (!line || line.startsWith('//') || line.startsWith('#')) return;
+    let m;
+    if ((m = line.match(/^colorset\s+(\w+)\s*=\s*\{([^}]*)\}/))) {
+      cs[m[1]] = m[2].split(',').map(s=>s.trim()).filter(Boolean); return;
+    }
+    if ((m = line.match(/^place\s+(\w+)\s*:\s*([\w*×]+)\s*=\s*\{([^}]*)\}/))) {
+      // Split on commas that are NOT inside parentheses (handles tuple tokens)
+      const toks = (function(str){
+        const out=[]; let cur='', depth=0;
+        for(const ch of str){ if(ch==='(')depth++; else if(ch===')')depth--; if(ch===','&&depth===0){const t=cur.trim();if(t)out.push(t);cur='';}else cur+=ch; }
+        const t=cur.trim(); if(t)out.push(t); return out;
+      })(m[3]);
+      places.push({ id:m[1], label:m[1], colorSet:m[2], initTokens:[...toks], tokens:[...toks] }); return;
+    }
+    if ((m = line.match(/^transition\s+(\w+)(?:\s*\[guard:\s*([^\]]*)\])?/))) {
+      transitions.push({ id:m[1], label:m[1], guard:m[2]?m[2].trim():'true' }); return;
+    }
+    if ((m = line.match(/^arc\s+(\w+)\s*-->\s*(\w+)\s*:\s*(.+)/))) {
+      arcs.push({ src:m[1], tgt:m[2], expr:m[3].trim() }); return;
+    }
+    errors.push(`Line ${i+1}: "${line.slice(0,40)}"`);
+  });
+  return { cs, places, transitions, arcs, errors };
+}
+
+// ═══════════════════════════════════════════════════════════
+// SERIALIZERS
+// ═══════════════════════════════════════════════════════════
+function serializeCPN() {
+  const lines = ['// CPN Tool — Professional Edition'];
+  if (Object.keys(S.colorsets).length) {
+    lines.push('');
+    for (const [n,v] of Object.entries(S.colorsets))
+      lines.push(`colorset ${n} = {${v.join(', ')}}`);
+  }
+  if (S.places.length) {
+    lines.push('');
+    S.places.forEach(p => lines.push(`place ${p.label} : ${p.colorSet||'TOKEN'} = {${p.initTokens.join(', ')}}`));
+  }
+  if (S.transitions.length) {
+    lines.push('');
+    S.transitions.forEach(t => {
+      const g = (t.guard && t.guard!=='true') ? ` [guard: ${t.guard}]` : '';
+      lines.push(`transition ${t.label}${g}`);
+    });
+  }
+  if (S.arcs.length) {
+    lines.push('');
+    S.arcs.forEach(a => {
+      const sn = findNode(a.src), tn = findNode(a.tgt);
+      if (sn && tn) lines.push(`arc ${sn.label} --> ${tn.label} : ${a.expr}`);
+    });
+  }
+  return lines.join('\n');
+}
+
+function serializePNML() {
+  const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  let x = `<?xml version="1.0" encoding="UTF-8"?>\n<pnml xmlns="http://www.pnml.org/version-2009/grammar/pnml">\n<net id="net0" type="http://www.pnml.org/version-2009/grammar/ptnet">\n<name><text>CPN Model</text></name>\n<page id="page0">\n`;
+  S.places.forEach(p => {
+    x += `<place id="${esc(p.id)}"><name><text>${esc(p.label)}</text></name>`;
+    x += `<graphics><position x="${Math.round(p.x)}" y="${Math.round(p.y)}"/></graphics>`;
+    if (p.initTokens.length) x += `<initialMarking><text>${esc(p.initTokens.join(','))}</text></initialMarking>`;
+    x += `<toolspecific tool="cpntool" version="1.0"><colorset>${esc(p.colorSet||'TOKEN')}</colorset></toolspecific>`;
+    x += `</place>\n`;
+  });
+  S.transitions.forEach(t => {
+    x += `<transition id="${esc(t.id)}"><name><text>${esc(t.label)}</text></name>`;
+    x += `<graphics><position x="${Math.round(t.x)}" y="${Math.round(t.y)}"/></graphics>`;
+    if (t.guard && t.guard!=='true') x += `<condition><text>${esc(t.guard)}</text></condition>`;
+    x += `</transition>\n`;
+  });
+  S.arcs.forEach((a,i) => {
+    x += `<arc id="arc${i}" source="${esc(a.src)}" target="${esc(a.tgt)}">`;
+    x += `<inscription><text>${esc(a.expr)}</text></inscription></arc>\n`;
+  });
+  x += `</page></net></pnml>`;
+  return x;
+}
+
+// ═══════════════════════════════════════════════════════════
+// AUTO LAYOUT
+// ═══════════════════════════════════════════════════════════
+function autoLayout() {
+  const W = document.getElementById('canvas-wrap').clientWidth || 800;
+  const H = document.getElementById('canvas-wrap').clientHeight || 500;
+  const all = [
+    ...S.places.map(p=>({...p,k:'place'})),
+    ...S.transitions.map(t=>({...t,k:'transition'})),
+  ];
+  if (!all.length) return;
+  const ind = {}; all.forEach(n=>(ind[n.id]=0));
+  S.arcs.forEach(a=>{ if(ind[a.tgt]!==undefined) ind[a.tgt]++; });
+  const layers = {}, vis = new Set();
+  const roots = all.filter(n=>ind[n.id]===0).map(n=>n.id);
+  roots.forEach(id=>{layers[id]=0; vis.add(id);});
+  const q = [...roots];
+  while(q.length){
+    const cur = q.shift();
+    S.arcs.filter(a=>a.src===cur).forEach(a=>{
+      if(!vis.has(a.tgt)){vis.add(a.tgt);layers[a.tgt]=(layers[cur]||0)+1;q.push(a.tgt);}
+    });
+  }
+  all.forEach(n=>{if(layers[n.id]===undefined)layers[n.id]=0;});
+  const byL = {};
+  all.forEach(n=>{ const l=layers[n.id]; (byL[l]=byL[l]||[]).push(n); });
+  const maxL = Math.max(...Object.keys(byL).map(Number), 0);
+  const PAD = 100, colW = (W-PAD*2)/Math.max(maxL,1);
+  Object.entries(byL).forEach(([l,nodes])=>{
+    const x = PAD + colW*Number(l);
+    const rowH = (H-PAD*2)/nodes.length;
+    nodes.forEach((n,i)=>{
+      const node = findNode(n.id);
+      if(node){ node.x = snapGrid(x); node.y = snapGrid(PAD+rowH*i+rowH/2); }
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// STATE SPACE ENGINE
+// ═══════════════════════════════════════════════════════════
+class StateSpace {
+  constructor() {
+    this.nodes = new Map();
+    this.nodeList = [];
+    this.edges = [];
+    this.truncated = false;
+  }
+  markingKey(m) {
+    return JSON.stringify(Object.fromEntries(
+      Object.entries(m).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>[k,[...v].sort()])
+    ));
+  }
+  cloneM(m) { const r={}; for(const[k,v]of Object.entries(m))r[k]=[...v]; return r; }
+
+  _tryBind(inArcs, idx, binding, marking) {
+    if (idx === inArcs.length) return binding;
+    const arc = inArcs[idx];
+    const tokens = marking[arc.src] || [];
+    const expr = arc.expr.trim();
+    if (/^\w+$/.test(expr)) {
+      for (const tok of tokens) {
+        const nb = {...binding, [expr]:tok};
+        const res = this._tryBind(inArcs, idx+1, nb, marking);
+        if (res!==null) return res;
+      }
+      return null;
+    }
+    const tm = expr.match(/^\((\w+),(\w+)\)$/);
+    if (tm) {
+      for (const tok of tokens) {
+        const parts = tok.replace(/[()]/g,'').split(',').map(s=>s.trim());
+        if (parts.length===2) {
+          const nb = {...binding,[tm[1]]:parts[0],[tm[2]]:parts[1]};
+          const res = this._tryBind(inArcs,idx+1,nb,marking);
+          if(res!==null)return res;
+        }
+      }
+      return null;
+    }
+    if (tokens.includes(expr)) return this._tryBind(inArcs,idx+1,binding,marking);
+    return null;
+  }
+  _resolve(expr, binding) {
+    const t=expr.trim();
+    if(binding[t]!==undefined)return binding[t];
+    const tm=t.match(/^\((\w+),(\w+)\)$/);
+    if(tm)return `(${binding[tm[1]]||tm[1]},${binding[tm[2]]||tm[2]})`;
+    return t;
+  }
+  getEnabled(marking) {
+    const res=[];
+    for(const t of S.transitions){
+      const inArcs=S.arcs.filter(a=>a.tgt===t.id);
+      if(!inArcs.length)continue;
+      const b=this._tryBind(inArcs,0,{},marking);
+      if(b!==null)res.push({t,binding:b});
+    }
+    return res;
+  }
+  fire(marking, item) {
+    const m=this.cloneM(marking);
+    S.arcs.filter(a=>a.tgt===item.t.id).forEach(arc=>{
+      const tok=this._resolve(arc.expr,item.binding);
+      const i=m[arc.src].indexOf(tok);
+      if(i!==-1)m[arc.src].splice(i,1);
+    });
+    S.arcs.filter(a=>a.src===item.t.id).forEach(arc=>{
+      const tok=this._resolve(arc.expr,item.binding);
+      if(m[arc.tgt]!==undefined)m[arc.tgt].push(tok);
+    });
+    return m;
+  }
+  explore(initMarking, maxStates=1000) {
+    const t0=Date.now();
+    const init=this.cloneM(initMarking);
+    const initKey=this.markingKey(init);
+    const initNode={id:0,key:initKey,marking:init,isDeadlock:false};
+    this.nodes.set(initKey,initNode);
+    this.nodeList.push(initNode);
+    const queue=[initNode]; let nid=1;
+    while(queue.length){
+      if(this.nodeList.length>=maxStates){this.truncated=true;break;}
+      const node=queue.shift();
+      const enabled=this.getEnabled(node.marking);
+      if(!enabled.length){node.isDeadlock=true;continue;}
+      for(const item of enabled){
+        const nm=this.fire(node.marking,item);
+        const key=this.markingKey(nm);
+        let tgt=this.nodes.get(key);
+        if(!tgt){tgt={id:nid++,key,marking:nm,isDeadlock:false};this.nodes.set(key,tgt);this.nodeList.push(tgt);queue.push(tgt);}
+        const bstr=Object.entries(item.binding).map(([k,v])=>`${k}=${v}`).join(',');
+        this.edges.push({from:node.id,to:tgt.id,transId:item.t.id,transLabel:item.t.label,binding:bstr});
+      }
+    }
+    return {nodeCount:this.nodeList.length,edgeCount:this.edges.length,
+            deadlocks:this.nodeList.filter(n=>n.isDeadlock),
+            truncated:this.truncated,timeMs:Date.now()-t0};
+  }
+  boundedness() {
+    const max={};S.places.forEach(p=>{max[p.id]=0;});
+    for(const node of this.nodeList)
+      for(const[pid,toks]of Object.entries(node.marking))
+        if(toks.length>(max[pid]||0))max[pid]=toks.length;
+    return max;
+  }
+  liveness() {
+    const fires=new Set(this.edges.map(e=>e.transId));
+    const r={};S.transitions.forEach(t=>{r[t.id]=fires.has(t.id);});
+    return r;
+  }
+  isReachable(targetM) {
+    const key=this.markingKey(targetM);
+    if(!this.nodes.has(key))return{reachable:false,path:null};
+    const initKey=this.nodeList[0]?.key;
+    if(!initKey||initKey===key)return{reachable:true,path:[]};
+    const visited=new Map([[initKey,null]]);
+    const q=[initKey];
+    while(q.length){
+      const cur=q.shift();
+      if(cur===key){
+        const path=[];let k=cur;
+        while(visited.get(k)!==null){const e=visited.get(k);path.unshift(e);k=this.nodeList[e.from].key;}
+        return{reachable:true,path};
+      }
+      const cNode=this.nodes.get(cur);
+      this.edges.filter(e=>e.from===cNode.id).forEach(e=>{
+        const nk=this.nodeList[e.to]?.key;
+        if(nk&&!visited.has(nk)){visited.set(nk,e);q.push(nk);}
+      });
+    }
+    return{reachable:false,path:null};
+  }
+  sccCount() {
+    const n=this.nodeList.length;
+    const adj=Array.from({length:n},()=>[]);
+    this.edges.forEach(e=>adj[e.from].push(e.to));
+    let idx=0,count=0;
+    const indices=new Array(n).fill(-1),low=new Array(n).fill(0),onStk=new Array(n).fill(false),stk=[];
+    const sc=(v)=>{
+      indices[v]=low[v]=idx++;stk.push(v);onStk[v]=true;
+      for(const w of(adj[v]||[])){
+        if(indices[w]===-1){sc(w);low[v]=Math.min(low[v],low[w]);}
+        else if(onStk[w])low[v]=Math.min(low[v],indices[w]);
+      }
+      if(low[v]===indices[v]){let w;do{w=stk.pop();onStk[w]=false;}while(w!==v);count++;}
+    };
+    for(let v=0;v<n;v++)if(indices[v]===-1)sc(v);
+    return count;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// SIMULATION ENGINE
+// ═══════════════════════════════════════════════════════════
+function getEnabled() {
+  const ss=new StateSpace();
+  const m={};S.places.forEach(p=>{m[p.id]=[...p.tokens];});
+  return ss.getEnabled(m);
+}
+function fireItem(item) {
+  const {t,binding}=item;
+  S.arcs.filter(a=>a.tgt===t.id).forEach(arc=>{
+    const place=S.places.find(p=>p.id===arc.src);
+    const tok=resolveExpr(arc.expr,binding);
+    const i=place.tokens.indexOf(tok);
+    if(i!==-1)place.tokens.splice(i,1);
+  });
+  S.arcs.filter(a=>a.src===t.id).forEach(arc=>{
+    const place=S.places.find(p=>p.id===arc.tgt);
+    if(place)place.tokens.push(resolveExpr(arc.expr,binding));
+  });
+  S.simStep++;
+  const bs=Object.entries(binding).map(([k,v])=>`${k}↦${v}`).join(' ');
+  log(`Fired: ${t.label}${bs?' ['+bs+']':''}`, 'fire');
+  render();
+}
+function resolveExpr(expr,binding) {
+  const t=expr.trim();
+  if(binding[t]!==undefined)return binding[t];
+  const tm=t.match(/^\((\w+),(\w+)\)$/);
+  if(tm)return`(${binding[tm[1]]||tm[1]},${binding[tm[2]]||tm[2]})`;
+  return t;
+}
+function simStep() {
+  const en=getEnabled();
+  if(!en.length){stopPlay();document.getElementById('deadlock-badge').style.display='block';log('Deadlock — no enabled transitions','warn');return;}
+  document.getElementById('deadlock-badge').style.display='none';
+  const item=en[Math.floor(Math.random()*en.length)];
+  // Flash
+  const tEl=document.querySelector(`[data-id="${item.t.id}"] .trans-body`);
+  if(tEl){tEl.classList.add('fir');setTimeout(()=>tEl.classList.remove('fir'),260);}
+  setTimeout(()=>fireItem(item),120);
+}
+function simReset() {
+  stopPlay();S.simStep=0;
+  S.places.forEach(p=>{p.tokens=[...p.initTokens];});
+  document.getElementById('deadlock-badge').style.display='none';
+  log('Simulation reset','system');render();
+}
+function startPlay(){S.playing=true;document.getElementById('btn-play').textContent='⏸ Pause';S.playTimer=setInterval(()=>{const en=getEnabled();if(!en.length){stopPlay();return;}simStep();},600);}
+function stopPlay(){S.playing=false;clearInterval(S.playTimer);document.getElementById('btn-play').textContent='⏵ Play';}
+
+// ═══════════════════════════════════════════════════════════
+// ANALYSIS
+// ═══════════════════════════════════════════════════════════
+function runAnalysis() {
+  const btn=document.getElementById('analyse-btn');
+  btn.classList.add('running'); btn.textContent='⊞ Running…';
+  // Switch to analysis tab
+  switchRightTab('analysis');
+  setTimeout(()=>{
+    const initM={};S.places.forEach(p=>{initM[p.id]=[...p.initTokens];});
+    const ss=new StateSpace();
+    const stats=ss.explore(initM,1000);
+    S.stateSpace=ss;
+    displayAnalysis(ss,stats);
+    btn.classList.remove('running');btn.textContent='⊞ Analyse';
+    log(`Analysis: ${stats.nodeCount} states, ${stats.edgeCount} arcs${stats.truncated?' (truncated)':''}`, 'system');
+  },10);
+}
+
+function displayAnalysis(ss,stats) {
+  document.getElementById('no-analysis').style.display='none';
+  document.getElementById('analysis-results').style.display='';
+
+  // Stats
+  const scc=ss.sccCount();
+  document.getElementById('ss-stats').innerHTML=`
+    <div class="analysis-stat"><span class="analysis-key">States</span><span class="analysis-val">${stats.nodeCount}${stats.truncated?' <span style="color:var(--amber)">(cap)</span>':''}</span></div>
+    <div class="analysis-stat"><span class="analysis-key">Arcs</span><span class="analysis-val">${stats.edgeCount}</span></div>
+    <div class="analysis-stat"><span class="analysis-key">Dead markings</span><span class="analysis-val ${stats.deadlocks.length?'warn':'good'}">${stats.deadlocks.length}</span></div>
+    <div class="analysis-stat"><span class="analysis-key">SCCs</span><span class="analysis-val">${scc}</span></div>
+    <div class="analysis-stat"><span class="analysis-key">Analysis time</span><span class="analysis-val">${stats.timeMs}ms</span></div>
+    <div class="analysis-stat"><span class="analysis-key">Strongly connected</span><span class="analysis-val ${scc===1?'good':'warn'}">${scc===1?'Yes':'No ('+scc+' SCCs)'}</span></div>
+  `;
+
+  // Boundedness
+  const bounds=ss.boundedness();
+  document.getElementById('ss-bounds').innerHTML=S.places.map(p=>{
+    const max=bounds[p.id]||0;
+    return`<div class="analysis-stat">
+      <span class="analysis-key">${esc(p.label)}</span>
+      <span><span class="analysis-badge badge-bounded">≤${max}</span></span>
+    </div>`;
+  }).join('');
+
+  // Liveness
+  const live=ss.liveness();
+  document.getElementById('ss-live').innerHTML=S.transitions.map(t=>{
+    const isLive=live[t.id];
+    return`<div class="analysis-stat">
+      <span class="analysis-key">${esc(t.label)}</span>
+      <span class="analysis-badge ${isLive?'badge-live':'badge-dead'}">${isLive?'LIVE':'DEAD'}</span>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════
+// CANVAS RENDERING
+// ═══════════════════════════════════════════════════════════
+function svgEl(tag,attrs={}) {
+  const e=document.createElementNS(SVG_NS,tag);
+  for(const[k,v]of Object.entries(attrs))e.setAttribute(k,v);
+  return e;
+}
+function svgTxt(tag,attrs,text) { const e=svgEl(tag,attrs); e.textContent=text; return e; }
+
+function findNode(id) { return S.places.find(p=>p.id===id)||S.transitions.find(t=>t.id===id); }
+function nodeKind(id) { return S.places.find(p=>p.id===id)?'place':S.transitions.find(t=>t.id===id)?'transition':null; }
+function snapGrid(v) { return S.snap ? Math.round(v/GRID)*GRID : v; }
+
+function getEdgePt(id, tx, ty) {
+  const n=findNode(id);if(!n)return{x:0,y:0};
+  const dx=tx-n.x,dy=ty-n.y,len=Math.sqrt(dx*dx+dy*dy)||1;
+  const ux=dx/len,uy=dy/len;
+  if(nodeKind(id)==='place')return{x:n.x+ux*PLACE_R,y:n.y+uy*PLACE_R};
+  const hw=TW/2,hh=TH/2;
+  const s=Math.min(hw/Math.abs(ux||.001),hh/Math.abs(uy||.001));
+  return{x:n.x+ux*s,y:n.y+uy*s};
+}
+
+function render() {
+  if(S.mode!=='visual') return;
+  const enabled=getEnabled();
+  const enTids=new Set(enabled.map(e=>e.t.id));
+  const enPids=new Set();
+  enabled.forEach(e=>{
+    S.arcs.filter(a=>a.tgt===e.t.id).forEach(a=>enPids.add(a.src));
+    S.arcs.filter(a=>a.src===e.t.id).forEach(a=>enPids.add(a.tgt));
+  });
+
+  renderArcs(enTids);
+  renderNodes(enTids,enPids);
+  updateEnabledPanel(enabled);
+  updateMarkingPanel();
+  updatePropsPanel();
+  updateStatusBar();
+}
+
+function renderArcs(enTids) {
+  const layer=document.getElementById('cv-arcs');
+  layer.innerHTML='';
+
+  // Build set of reverse arc pairs to decide straight vs curved
+  const arcPairs=new Set(S.arcs.map(a=>a.src+'>'+a.tgt));
+  const ARROW_OFFSET=10; // px beyond node surface for arrowhead
+
+  S.arcs.forEach((arc,i)=>{
+    const sn=findNode(arc.src), tn=findNode(arc.tgt);
+    if(!sn||!tn)return;
+    const isEn=enTids.has(arc.src)||enTids.has(arc.tgt);
+    const hasReverse=arcPairs.has(arc.tgt+'>'+arc.src);
+
+    // p1 = exit point on source surface, facing target
+    // p2 = point on target surface facing source (arrowhead lands here)
+    const p1=getEdgePt(arc.src, tn.x, tn.y);
+    const p2=getEdgePt(arc.tgt, sn.x, sn.y);
+
+    // Control point: curve if parallel arc exists, else gentle straight
+    const CURVE=hasReverse?0.22:0.06;
+    const dx=p2.x-p1.x, dy=p2.y-p1.y;
+    const cx=(p1.x+p2.x)/2 - dy*CURVE;
+    const cy=(p1.y+p2.y)/2 + dx*CURVE;
+
+    // True midpoint on quadratic bezier at t=0.5
+    const mx=0.25*p1.x+0.5*cx+0.25*p2.x;
+    const my=0.25*p1.y+0.5*cy+0.25*p2.y;
+
+    // SVG path with proper spaces
+    const d=`M ${p1.x.toFixed(2)},${p1.y.toFixed(2)} Q ${cx.toFixed(2)},${cy.toFixed(2)} ${p2.x.toFixed(2)},${p2.y.toFixed(2)}`;
+
+    const g=svgEl('g',{'data-arc':arc.id});
+    if(isEn)g.appendChild(svgEl('path',{d,class:'arc-glow'}));
+    g.appendChild(svgEl('path',{d,
+      class:'arc-path'+(isEn?' en':''),
+      'marker-end':isEn?'url(#arr-en)':'url(#arr)'
+    }));
+
+    // Label — wide enough for tuple expressions like "(j,w)"
+    const expr=arc.expr;
+    const lblW=Math.max(44, expr.length*7+16);
+    const lbg=svgEl('rect',{
+      x:mx-lblW/2, y:my-9, width:lblW, height:17, rx:3,
+      class:'arc-lbl-bg',
+      stroke:isEn?'#2563eb':'#0e2540','stroke-width':'0.8'
+    });
+    const lt=svgTxt('text',{
+      x:mx, y:my+5, 'text-anchor':'middle',
+      class:'arc-lbl-txt', fill:isEn?'#7dd3fc':'#2a5580'
+    }, expr);
+    g.appendChild(lbg); g.appendChild(lt);
+
+    // Hit area for double-click edit
+    const hit=svgEl('path',{d,stroke:'transparent','stroke-width':'14',fill:'none',style:'cursor:pointer'});
+    hit.addEventListener('dblclick',ev=>{ev.stopPropagation();openArcModal(arc);});
+    hit.addEventListener('contextmenu',ev=>{ev.preventDefault();ev.stopPropagation();});
+    g.appendChild(hit);
+    layer.appendChild(g);
+  });
+}
+
+function renderNodes(enTids,enPids) {
+  const layer=document.getElementById('cv-nodes');
+  layer.innerHTML='';
+  S.places.forEach(p=>layer.appendChild(buildPlace(p,enPids)));
+  S.transitions.forEach(t=>layer.appendChild(buildTrans(t,enTids)));
+}
+
+function buildPlace(p,enPids) {
+  const isSel=S.selected?.id===p.id;
+  const isEn=enPids.has(p.id);
+  const toks=p.tokens;
+  const g=svgEl('g',{'data-id':p.id,transform:`translate(${p.x},${p.y})`});
+  // Glow
+  if(isEn)g.appendChild(svgEl('circle',{cx:0,cy:0,r:PLACE_R+14,fill:'#3b82f615',class:'place-outer'}));
+  g.appendChild(svgEl('circle',{cx:0,cy:0,r:PLACE_R,class:'place-body'+(isSel?' sel':isEn?' en':'')}));
+  g.appendChild(svgEl('circle',{cx:0,cy:0,r:PLACE_R-9,class:'place-ring'}));
+  // Text
+  g.appendChild(svgTxt('text',{x:0,y:toks.length>0?-12:-4,'text-anchor':'middle',class:'place-lbl'},p.label));
+  g.appendChild(svgTxt('text',{x:0,y:5,'text-anchor':'middle',class:'place-cs'},`\u3008${p.colorSet||'?'}\u3009`));
+  // Tokens
+  if(!toks.length) {
+    g.appendChild(svgTxt('text',{x:0,y:PLACE_R-10,'text-anchor':'middle',class:'empty-mark'},'∅'));
+  } else {
+    const show=toks.slice(0,4),extra=toks.length-show.length;
+    show.forEach((tok,i)=>{
+      const tx=(i-(show.length-1)/2)*17, ty=PLACE_R-14;
+      const dg=svgEl('g');
+      dg.appendChild(svgEl('circle',{cx:tx,cy:ty,r:7,class:'tok-dot'}));
+      dg.appendChild(svgTxt('text',{x:tx,y:ty+3.5,'text-anchor':'middle',class:'tok-lbl'},tok.length>3?tok.slice(0,3):tok));
+      const title=svgEl('title');title.textContent=tok;dg.appendChild(title);
+      g.appendChild(dg);
+    });
+    if(extra>0)g.appendChild(svgTxt('text',{x:show.length*9+4,y:PLACE_R-10,'font-size':'8',fill:'#f59e0b'},`+${extra}`));
+  }
+  attachNodeEvents(g,'place',p.id);
+  return g;
+}
+
+function buildTrans(t,enTids) {
+  const isSel=S.selected?.id===t.id;
+  const isEn=enTids.has(t.id);
+  const g=svgEl('g',{'data-id':t.id,transform:`translate(${t.x},${t.y})`});
+  if(isEn)g.appendChild(svgEl('rect',{x:-TW/2-8,y:-TH/2-8,width:TW+16,height:TH+16,rx:6,fill:'#16a34a15'}));
+  g.appendChild(svgEl('rect',{x:-TW/2,y:-TH/2,width:TW,height:TH,rx:4,class:'trans-body'+(isSel?' sel':isEn?' en':'')}));
+  g.appendChild(svgTxt('text',{x:0,y:t.guard&&t.guard!=='true'?-4:4,'text-anchor':'middle',class:'trans-lbl'},t.label));
+  if(t.guard&&t.guard!=='true'){
+    const gs=t.guard.length>18?t.guard.slice(0,16)+'…':t.guard;
+    g.appendChild(svgTxt('text',{x:0,y:11,'text-anchor':'middle',class:'trans-guard'},`[${gs}]`));
+  }
+  attachNodeEvents(g,'transition',t.id);
+  return g;
+}
+
+// ═══════════════════════════════════════════════════════════
+// NODE INTERACTION
+// ═══════════════════════════════════════════════════════════
+let drag=null;
+
+function attachNodeEvents(g,kind,id) {
+  g.addEventListener('mousedown',ev=>{
+    ev.stopPropagation();
+    if(ev.button===2){openCtxMenu(ev,kind,id);return;}
+
+    if(S.tool==='delete'){execCmd(Cmd.deleteNode(kind,id));return;}
+    if(S.tool==='arc'){
+      if(!S.arcSrc){S.arcSrc={kind,id};g.style.opacity='0.5';}
+      else{
+        if(S.arcSrc.id!==id){
+          const cmd=Cmd.addArc(S.arcSrc.id,id,'x');
+          execCmd(cmd);
+          const arc=S.arcs[S.arcs.length-1];
+          openArcModal(arc);
+        }
+        clearArcDraw();
+      }
+      return;
+    }
+    // Select + drag
+    S.selected={type:kind,id};
+    const node=findNode(id);
+    drag={id,kind,ox:ev.clientX,oy:ev.clientY,nx:node.x,ny:node.y,moved:false};
+    document.addEventListener('mousemove',onDragMove,{passive:true});
+    document.addEventListener('mouseup',onDragEnd,{once:true});
+    render();
+  });
+  g.addEventListener('dblclick',ev=>{
+    ev.stopPropagation();
+    if(kind==='transition'){
+      const en=getEnabled();
+      const item=en.find(e=>e.t.id===id);
+      if(item){fireItem(item);return;}
+    }
+    S.selected={type:kind,id};render();
+  });
+  g.addEventListener('contextmenu',ev=>{ev.preventDefault();openCtxMenu(ev,kind,id);});
+}
+
+function svgPoint(ev) {
+  const svg=document.getElementById('cpn-svg');
+  const pt=svg.createSVGPoint();
+  pt.x=ev.clientX;pt.y=ev.clientY;
+  return pt.matrixTransform(svg.getScreenCTM().inverse());
+}
+
+function onDragMove(ev) {
+  if(!drag)return;
+  const node=findNode(drag.id);if(!node)return;
+  const sp=svgPoint(ev);
+  const rawX=drag.nx+(sp.x-svgPoint({clientX:drag.ox,clientY:drag.oy}).x);
+  const rawY=drag.ny+(sp.y-svgPoint({clientX:drag.ox,clientY:drag.oy}).y);
+  node.x=snapGrid(rawX);node.y=snapGrid(rawY);
+  drag.moved=true;
+  render();
+}
+
+function onDragEnd(ev) {
+  if(drag&&drag.moved){
+    const node=findNode(drag.id);
+    // Push move to history
+    const cmd=Cmd.moveNode(drag.id,drag.nx,drag.ny,node.x,node.y);
+    // Don't re-execute (already done), just push to history
+    S.history.splice(S.histIdx+1);
+    S.history.push({do:()=>{node.x=node.x;node.y=node.y;},undo:()=>{node.x=drag.nx;node.y=drag.ny;}});
+    S.histIdx=S.history.length-1;
+  }
+  drag=null;
+  document.removeEventListener('mousemove',onDragMove);
+}
+
+// ═══════════════════════════════════════════════════════════
+// PAN + ZOOM
+// ═══════════════════════════════════════════════════════════
+let panning=false,panStart={x:0,y:0},panOrigin={tx:0,ty:0};
+
+function applyTransform() {
+  document.getElementById('cv-root').setAttribute('transform',`translate(${S.tx},${S.ty}) scale(${S.scale})`);
+  document.getElementById('sb-zoom').textContent=Math.round(S.scale*100)+'%';
+}
+
+function zoomAt(cx,cy,factor) {
+  const newScale=Math.min(4,Math.max(0.15,S.scale*factor));
+  const f=newScale/S.scale;
+  S.tx=cx-(cx-S.tx)*f;
+  S.ty=cy-(cy-S.ty)*f;
+  S.scale=newScale;
+  applyTransform();
+}
+
+function fitToScreen() {
+  if(!S.places.length&&!S.transitions.length)return;
+  const all=[...S.places,...S.transitions];
+  const W=document.getElementById('canvas-wrap').clientWidth;
+  const H=document.getElementById('canvas-wrap').clientHeight;
+  const pad=80;
+  const minX=Math.min(...all.map(n=>n.x))-PLACE_R;
+  const maxX=Math.max(...all.map(n=>n.x))+PLACE_R;
+  const minY=Math.min(...all.map(n=>n.y))-PLACE_R;
+  const maxY=Math.max(...all.map(n=>n.y))+PLACE_R;
+  const scaleX=(W-pad*2)/(maxX-minX||1);
+  const scaleY=(H-pad*2)/(maxY-minY||1);
+  S.scale=Math.min(1.5,Math.min(scaleX,scaleY));
+  S.tx=W/2-((minX+maxX)/2)*S.scale;
+  S.ty=H/2-((minY+maxY)/2)*S.scale;
+  applyTransform();
+}
+
+const cvWrap=document.getElementById('canvas-wrap');
+cvWrap.addEventListener('wheel',ev=>{
+  ev.preventDefault();
+  const rect=cvWrap.getBoundingClientRect();
+  const cx=ev.clientX-rect.left,cy=ev.clientY-rect.top;
+  zoomAt(cx,cy,ev.deltaY<0?1.1:0.91);
+},{passive:false});
+
+cvWrap.addEventListener('mousedown',ev=>{
+  if(ev.button===1||(ev.button===0&&ev.altKey)){
+    panning=true;panStart={x:ev.clientX,y:ev.clientY};panOrigin={tx:S.tx,ty:S.ty};
+    document.getElementById('cpn-svg').classList.add('panning');
+    ev.preventDefault();
+  }
+});
+document.addEventListener('mousemove',ev=>{
+  if(!panning)return;
+  S.tx=panOrigin.tx+(ev.clientX-panStart.x);
+  S.ty=panOrigin.ty+(ev.clientY-panStart.y);
+  applyTransform();
+});
+document.addEventListener('mouseup',ev=>{
+  if(panning){panning=false;document.getElementById('cpn-svg').classList.remove('panning');}
+});
+
+// Canvas click
+document.getElementById('cpn-svg').addEventListener('click',ev=>{
+  if(drag?.moved)return;
+  const sp=svgPoint(ev);
+  const x=snapGrid((sp.x-0)/1), y=snapGrid((sp.y-0)/1);
+  if(S.tool==='place'){execCmd(Cmd.addPlace(x,y));return;}
+  if(S.tool==='transition'){execCmd(Cmd.addTransition(x,y));return;}
+  if(S.tool==='arc'){clearArcDraw();return;}
+  S.selected=null;render();
+});
+
+// Mouse move for arc preview + cursor coords
+document.getElementById('cpn-svg').addEventListener('mousemove',ev=>{
+  const sp=svgPoint(ev);
+  document.getElementById('sb-cursor').textContent=`x:${Math.round(sp.x)} y:${Math.round(sp.y)}`;
+  if(!S.arcSrc)return;
+  const prev=document.getElementById('cv-preview');
+  prev.innerHTML='';
+  const src=findNode(S.arcSrc.id);if(!src)return;
+  const ep=getEdgePt(S.arcSrc.id,sp.x,sp.y);
+  const d2=`M ${ep.x.toFixed(1)},${ep.y.toFixed(1)} L ${sp.x.toFixed(1)},${sp.y.toFixed(1)}`;
+  prev.appendChild(svgEl('path',{d:d2,class:'arc-preview','marker-end':'url(#arr-pr)'}));
+});
+
+function clearArcDraw() {
+  S.arcSrc=null;
+  document.getElementById('cv-preview').innerHTML='';
+  document.querySelectorAll('[data-id]').forEach(g=>g.style.opacity='');
+}
+
+// Context menu
+function openCtxMenu(ev,kind,id) {
+  S.ctxTarget={kind,id};S.selected={type:kind,id};render();
+  const m=document.getElementById('ctx-menu');
+  const fireEl=document.getElementById('ctx-fire');
+  fireEl.style.display=kind==='transition'?'':'none';
+  m.style.display='block';m.style.left=ev.clientX+'px';m.style.top=ev.clientY+'px';
+}
+document.getElementById('ctx-fire').addEventListener('click',()=>{
+  if(!S.ctxTarget)return;
+  const en=getEnabled();const item=en.find(e=>e.t.id===S.ctxTarget.id);
+  if(item)fireItem(item);else log('Transition not enabled','warn');
+  closeCtxMenu();
+});
+document.getElementById('ctx-edit').addEventListener('click',()=>{
+  if(S.ctxTarget){S.selected=S.ctxTarget;updatePropsPanel();}
+  closeCtxMenu();
+});
+document.getElementById('ctx-del').addEventListener('click',()=>{
+  if(S.ctxTarget)execCmd(Cmd.deleteNode(S.ctxTarget.kind,S.ctxTarget.id));
+  closeCtxMenu();
+});
+function closeCtxMenu(){document.getElementById('ctx-menu').style.display='none';}
+document.addEventListener('click',()=>closeCtxMenu());
+
+// ═══════════════════════════════════════════════════════════
+// PROPERTIES PANEL
+// ═══════════════════════════════════════════════════════════
+function updatePropsPanel() {
+  if(!S.selected){
+    document.getElementById('props-form').style.display='none';
+    document.getElementById('no-sel').style.display='';return;
+  }
+  document.getElementById('props-form').style.display='';
+  document.getElementById('no-sel').style.display='none';
+  const node=findNode(S.selected.id);if(!node)return;
+  const isP=S.selected.type==='place';
+  document.getElementById('p-name').value=node.label;
+  document.getElementById('pg-cs').style.display=isP?'':'none';
+  document.getElementById('pg-init').style.display=isP?'':'none';
+  document.getElementById('pg-toks').style.display=isP?'':'none';
+  document.getElementById('pg-guard').style.display=isP?'none':'';
+  if(isP){
+    document.getElementById('p-cs').value=node.colorSet||'';
+    document.getElementById('p-init').value=(node.initTokens||[]).join(', ');
+    document.getElementById('p-toks').textContent=node.tokens.length?node.tokens.join(', '):'∅';
+  } else {
+    document.getElementById('p-guard').value=node.guard||'true';
+  }
+}
+
+document.getElementById('p-name').addEventListener('change',ev=>{
+  if(!S.selected)return;
+  const node=findNode(S.selected.id);
+  execCmd(Cmd.editProp(S.selected.id,'label',node.label,ev.target.value));
+});
+document.getElementById('p-cs').addEventListener('change',ev=>{
+  if(!S.selected)return;
+  const node=findNode(S.selected.id);
+  execCmd(Cmd.editProp(S.selected.id,'colorSet',node.colorSet,ev.target.value));
+});
+document.getElementById('p-init').addEventListener('change',ev=>{
+  if(!S.selected)return;
+  const node=findNode(S.selected.id);
+  const newToks=ev.target.value.split(',').map(s=>s.trim()).filter(Boolean);
+  execCmd(Cmd.editProp(S.selected.id,'initTokens',node.initTokens,newToks));
+  render();
+});
+document.getElementById('p-guard').addEventListener('change',ev=>{
+  if(!S.selected)return;
+  const node=findNode(S.selected.id);
+  execCmd(Cmd.editProp(S.selected.id,'guard',node.guard,ev.target.value));
+});
+document.getElementById('snap-chk').addEventListener('change',ev=>{
+  S.snap=ev.target.checked;
+  document.getElementById('sb-snap').querySelector('.sb-val').textContent=S.snap?'ON':'OFF';
+});
+
+// ═══════════════════════════════════════════════════════════
+// ARC MODAL
+// ═══════════════════════════════════════════════════════════
+let editingArc=null;
+function openArcModal(arc) {
+  editingArc=arc;
+  document.getElementById('m-arc-expr').value=arc.expr;
+  document.getElementById('arc-modal').style.display='';
+  document.getElementById('help-modal').style.display='none';
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('m-arc-expr').focus();
+}
+document.getElementById('m-ok').addEventListener('click',()=>{
+  if(editingArc)editingArc.expr=document.getElementById('m-arc-expr').value.trim()||'x';
+  document.getElementById('overlay').classList.remove('open');
+  editingArc=null;render();
+});
+document.getElementById('m-cancel').addEventListener('click',()=>{
+  document.getElementById('overlay').classList.remove('open');editingArc=null;
+});
+document.getElementById('m-arc-expr').addEventListener('keydown',ev=>{
+  if(ev.key==='Enter')document.getElementById('m-ok').click();
+  if(ev.key==='Escape')document.getElementById('m-cancel').click();
+});
+
+// Help modal
+document.getElementById('btn-help').addEventListener('click',()=>{
+  document.getElementById('arc-modal').style.display='none';
+  document.getElementById('help-modal').style.display='';
+  document.getElementById('overlay').classList.add('open');
+});
+document.getElementById('help-close').addEventListener('click',()=>{
+  document.getElementById('overlay').classList.remove('open');
+});
+document.getElementById('overlay').addEventListener('click',ev=>{
+  if(ev.target===document.getElementById('overlay'))document.getElementById('overlay').classList.remove('open');
+});
+
+// ═══════════════════════════════════════════════════════════
+// MARKING + ENABLED PANELS
+// ═══════════════════════════════════════════════════════════
+function updateMarkingPanel() {
+  const el=document.getElementById('marking-panel');
+  el.replaceChildren();
+  if(!S.places.length){
+    const d=document.createElement('div');
+    d.style.cssText='font-size:9px;color:var(--text3);padding:6px 10px';
+    d.textContent='No places';
+    el.appendChild(d);
+    return;
+  }
+  S.places.forEach(p=>{
+    const row=document.createElement('div');row.className='mark-row';
+    const name=document.createElement('span');name.className='mark-name';name.textContent=p.label;
+    const val=document.createElement('span');val.className='mark-val';val.textContent=p.tokens.length;
+    row.appendChild(name);row.appendChild(val);el.appendChild(row);
+  });
+}
+function updateEnabledPanel(enabled) {
+  const list=document.getElementById('enabled-list');
+  list.replaceChildren();
+  if(!enabled.length){
+    const d=document.createElement('div');
+    d.style.cssText='font-size:9px;color:var(--text3)';
+    d.textContent='None enabled';
+    list.appendChild(d);
+    return;
+  }
+  enabled.forEach((item,i)=>{
+    const btn=document.createElement('button');btn.className='en-btn';
+    btn.textContent=item.t.label;
+    const bs=Object.entries(item.binding).map(([k,v])=>`${esc(k)}↦${esc(v)}`).join(' ');
+    if(bs){const bind=document.createElement('span');bind.className='en-bind';bind.textContent=`[${bs}]`;btn.appendChild(bind);}
+    btn.addEventListener('click',()=>fireItem(item));
+    list.appendChild(btn);
+  });
+}
+function updateStatusBar() {
+  document.getElementById('sb-p').textContent=S.places.length;
+  document.getElementById('sb-t').textContent=S.transitions.length;
+  document.getElementById('sb-a').textContent=S.arcs.length;
+  document.getElementById('sb-tok').textContent=S.places.reduce((s,p)=>s+p.tokens.length,0);
+  document.getElementById('step-num').textContent=S.simStep;
+}
+
+// ═══════════════════════════════════════════════════════════
+// LOG
+// ═══════════════════════════════════════════════════════════
+function log(msg,kind='system') {
+  S.log.push({msg,kind});
+  const c=document.getElementById('log-pane');
+  const d=document.createElement('div');
+  d.className=`log-entry ${kind}`;
+  const num=document.createElement('span');num.className='log-num';num.textContent=`#${String(S.log.length).padStart(3,'0')}`;
+  d.appendChild(num);d.appendChild(document.createTextNode(msg));
+  c.appendChild(d);c.scrollTop=c.scrollHeight;
+}
+
+// ═══════════════════════════════════════════════════════════
+// TEXT EDITOR — SYNTAX HIGHLIGHTING
+// ═══════════════════════════════════════════════════════════
+function hlLine(line) {
+  if(!line.trim())return'<br>';
+  const e=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  if(line.trim().startsWith('//')||line.trim().startsWith('#'))return`<span class="hl-cm">${e(line)}</span>`;
+  let m;
+  m=line.match(/^(\s*)(colorset)(\s+)(\w+)(\s*=\s*)(\{)([^}]*)(\})(.*)/);
+  if(m){const toks=m[7].split(',').map(t=>`<span class="hl-tk">${e(t.trim())}</span>`).join('<span class="hl-pt">, </span>');return`${e(m[1])}<span class="hl-kw">${m[2]}</span>${e(m[3])}<span class="hl-nm">${m[4]}</span><span class="hl-pt">${e(m[5])}{</span>${toks}<span class="hl-pt">}</span>${e(m[9])}`;}
+  m=line.match(/^(\s*)(place)(\s+)(\w+)(\s*:\s*)([\w*×]+)(\s*=\s*)(\{)([^}]*)(\})(.*)/);
+  if(m){const toks=m[9].split(',').map(t=>`<span class="hl-tk">${e(t.trim())}</span>`).join('<span class="hl-pt">, </span>');return`${e(m[1])}<span class="hl-kw">${m[2]}</span>${e(m[3])}<span class="hl-nm">${m[4]}</span><span class="hl-pt">:</span><span class="hl-cs">${m[6]}</span><span class="hl-pt">${e(m[7])}{</span>${toks}<span class="hl-pt">}</span>${e(m[11])}`;}
+  m=line.match(/^(\s*)(transition)(\s+)(\w+)(\s*)(\[guard:\s*)?([^\]]*)?(\])?/);
+  if(m){let o=`${e(m[1])}<span class="hl-kw">${m[2]}</span>${e(m[3])}<span class="hl-nm">${m[4]}</span>`;if(m[6])o+=`<span class="hl-pt">${e(m[5]+m[6])}</span><span class="hl-gd">${e(m[7]||'')}</span><span class="hl-pt">${m[8]||'}'}</span>`;return o;}
+  m=line.match(/^(\s*)(arc)(\s+)(\w+)(\s*-->\s*)(\w+)(\s*:\s*)(.*)/);
+  if(m)return`${e(m[1])}<span class="hl-kw">${m[2]}</span>${e(m[3])}<span class="hl-nm">${m[4]}</span><span class="hl-pt">${e(m[5])}</span><span class="hl-nm">${m[6]}</span><span class="hl-pt">${e(m[7])}</span><span class="hl-ex">${e(m[8])}</span>`;
+  return e(line);
+}
+function updateHL() {
+  const val=document.getElementById('cpn-editor').value;
+  const lines=val.split('\n');
+  document.getElementById('hl-overlay').innerHTML=lines.map(l=>`<div>${hlLine(l)}</div>`).join('');
+  document.getElementById('line-nums').innerHTML=lines.map((_,i)=>`<div>${i+1}</div>`).join('');
+}
+const ed=document.getElementById('cpn-editor');
+ed.addEventListener('input',()=>{updateHL();debounceApply();});
+ed.addEventListener('scroll',()=>{document.getElementById('hl-overlay').scrollTop=ed.scrollTop;ed.scrollLeft&&(document.getElementById('hl-overlay').scrollLeft=ed.scrollLeft);});
+ed.addEventListener('keydown',ev=>{
+  if(ev.key==='Tab'){ev.preventDefault();const s=ed.selectionStart,e2=ed.selectionEnd;ed.value=ed.value.slice(0,s)+'  '+ed.value.slice(e2);ed.selectionStart=ed.selectionEnd=s+2;updateHL();}
+  if(ev.key==='Enter'&&ev.ctrlKey)applyText();
+});
+let applyTimer=null;
+function debounceApply(){clearTimeout(applyTimer);applyTimer=setTimeout(applyText,700);}
+function applyText() {
+  const src=ed.value;
+  const res=parseCPN(src);
+  const dot=document.getElementById('dot'),dotTxt=document.getElementById('dot-txt'),errBar=document.getElementById('err-bar');
+  if(res.errors.length){errBar.textContent=res.errors.join(' | ');errBar.style.display='';dot.classList.add('err');dotTxt.textContent=`${res.errors.length} error(s)`;return;}
+  errBar.style.display='none';dot.classList.remove('err');dotTxt.textContent='OK';
+  const pos={};[...S.places,...S.transitions].forEach(n=>{pos[n.id]={x:n.x,y:n.y};});
+  S.colorsets=res.cs;
+  S.places=res.places.map(p=>({...p,x:pos[p.id]?.x||0,y:pos[p.id]?.y||0}));
+  S.transitions=res.transitions.map(t=>({...t,x:pos[t.id]?.x||0,y:pos[t.id]?.y||0}));
+  const byLabel={};[...S.places,...S.transitions].forEach(n=>{byLabel[n.label]=n;});
+  S.arcs=res.arcs.map((a,i)=>({id:'arc'+i,src:byLabel[a.src]?.id||a.src,tgt:byLabel[a.tgt]?.id||a.tgt,expr:a.expr})).filter(a=>a.src&&a.tgt);
+  if(![...S.places,...S.transitions].some(n=>n.x))autoLayout();
+  log(`Loaded: ${S.places.length}P ${S.transitions.length}T ${S.arcs.length}A`,'system');
+  if(S.mode==='visual')render();
+}
+
+// ═══════════════════════════════════════════════════════════
+// MODE SWITCHING
+// ═══════════════════════════════════════════════════════════
+function switchMode(mode) {
+  S.mode=mode;
+  document.querySelectorAll('.mode-tab').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
+  document.getElementById('canvas-wrap').style.display=mode==='visual'?'':'none';
+  document.getElementById('editor-wrap').style.display=mode==='text'?'flex':'none';
+  if(mode==='text'){ed.value=serializeCPN();updateHL();}
+  else{applyText();render();}
+}
+document.querySelectorAll('.mode-tab').forEach(b=>b.addEventListener('click',()=>switchMode(b.dataset.mode)));
+
+// ═══════════════════════════════════════════════════════════
+// RIGHT PANEL TABS
+// ═══════════════════════════════════════════════════════════
+function switchRightTab(tab) {
+  document.querySelectorAll('.right-tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
+  document.getElementById('log-pane').style.display=tab==='log'?'':'none';
+  document.getElementById('enabled-pane').style.display=tab==='log'?'':'none';
+  document.getElementById('analysis-pane').style.display=tab==='analysis'?'':'none';
+  document.getElementById('analysis-pane').classList.toggle('active',tab==='analysis');
+}
+document.querySelectorAll('.right-tab').forEach(b=>b.addEventListener('click',()=>switchRightTab(b.dataset.tab)));
+
+// ═══════════════════════════════════════════════════════════
+// TOOL PALETTE
+// ═══════════════════════════════════════════════════════════
+document.querySelectorAll('.tool-btn').forEach(b=>b.addEventListener('click',()=>{
+  S.tool=b.dataset.tool;clearArcDraw();
+  document.querySelectorAll('.tool-btn').forEach(x=>x.classList.toggle('active',x===b));
+  const svg=document.getElementById('cpn-svg');
+  svg.className=`tool-${S.tool}`;
+}));
+
+// ═══════════════════════════════════════════════════════════
+// EXPORT / IMPORT
+// ═══════════════════════════════════════════════════════════
+function dl(content, filename, type) {
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([content],{type}));
+  a.download=filename;a.click();
+}
+document.getElementById('btn-svg').addEventListener('click',()=>{
+  const svg=document.getElementById('cpn-svg');
+  let s=new XMLSerializer().serializeToString(svg);
+  s=s.replace('<svg','<svg xmlns="http://www.w3.org/2000/svg" style="background:#07101e"');
+  dl(s,'cpn-diagram.svg','image/svg+xml');
+});
+document.getElementById('btn-png').addEventListener('click',()=>{
+  const svg=document.getElementById('cpn-svg');
+  const W=svg.clientWidth,H=svg.clientHeight;
+  const s=new XMLSerializer().serializeToString(svg);
+  const blob=new Blob([s],{type:'image/svg+xml;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const img=new Image();
+  img.onload=()=>{
+    const c=document.createElement('canvas');c.width=W*2;c.height=H*2;
+    const ctx=c.getContext('2d');ctx.scale(2,2);ctx.fillStyle='#07101e';ctx.fillRect(0,0,W,H);
+    ctx.drawImage(img,0,0,W,H);URL.revokeObjectURL(url);
+    c.toBlob(b=>{dl(URL.createObjectURL(b),'cpn-diagram.png','image/png');const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='cpn-diagram.png';a.click();},'image/png');
+  };img.src=url;
+});
+document.getElementById('btn-pnml').addEventListener('click',()=>dl(serializePNML(),'net.pnml','application/xml'));
+document.getElementById('btn-cpn').addEventListener('click',()=>dl(serializeCPN(),'net.cpn','text/plain'));
+document.getElementById('btn-import').addEventListener('click',()=>document.getElementById('file-inp').click());
+document.getElementById('file-inp').addEventListener('change',ev=>{
+  const f=ev.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=e=>{loadFromText(e.target.result);};
+  r.readAsText(f);ev.target.value='';
+});
+
+// ═══════════════════════════════════════════════════════════
+// LOAD FROM TEXT
+// ═══════════════════════════════════════════════════════════
+function loadFromText(src) {
+  S.simStep=0;S.selected=null;S.history=[];S.histIdx=-1;S.stateSpace=null;
+  document.getElementById('deadlock-badge').style.display='none';
+  document.getElementById('no-analysis').style.display='';
+  document.getElementById('analysis-results').style.display='none';
+  ed.value=src;updateHL();applyText();
+  if(S.mode==='text')return;
+  autoLayout();render();fitToScreen();
+  log('Net loaded','system');
+}
+
+// ═══════════════════════════════════════════════════════════
+// EXAMPLES
+// ═══════════════════════════════════════════════════════════
+document.querySelectorAll('.ex-btn').forEach(b=>b.addEventListener('click',()=>loadFromText(EXAMPLES[b.dataset.ex])));
+
+// ═══════════════════════════════════════════════════════════
+// SIM CONTROLS
+// ═══════════════════════════════════════════════════════════
+document.getElementById('btn-step').addEventListener('click',simStep);
+document.getElementById('btn-reset').addEventListener('click',simReset);
+document.getElementById('btn-play').addEventListener('click',()=>S.playing?stopPlay():startPlay());
+document.getElementById('analyse-btn').addEventListener('click',runAnalysis);
+
+// ═══════════════════════════════════════════════════════════
+// REACHABILITY QUERY
+// ═══════════════════════════════════════════════════════════
+document.getElementById('reach-btn').addEventListener('click',()=>{
+  if(!S.stateSpace){log('Run analysis first','warn');return;}
+  const inp=document.getElementById('reach-input').value.trim();
+  const res=document.getElementById('reach-result');
+  try {
+    const partial=JSON.parse(inp);
+    // Build full marking from current initial + override with query
+    const target={};S.places.forEach(p=>{target[p.id]=partial[p.label]||partial[p.id]||[];});
+    const r=S.stateSpace.isReachable(target);
+    res.style.display='';
+    if(r.reachable){res.className='reach-result yes';res.textContent=`✓ Reachable${r.path?` (${r.path.length} steps)`:''}`;res.style.background='#051508';res.style.color='var(--trans-hi)';res.style.border='1px solid var(--trans)';}
+    else{res.className='reach-result no';res.textContent='✕ Not reachable from initial marking';res.style.background='#150505';res.style.color='var(--red)';res.style.border='1px solid var(--red)';}
+    res.style.padding='5px 7px';res.style.borderRadius='3px';res.style.fontSize='10px';res.style.marginTop='5px';
+  } catch(e) {res.style.display='';res.textContent='Invalid JSON: '+e.message;res.style.background='#150505';res.style.color='var(--amber)';res.style.border='1px solid var(--amber)';res.style.padding='5px 7px';res.style.borderRadius='3px';res.style.fontSize='10px';res.style.marginTop='5px';}
+});
+
+// ═══════════════════════════════════════════════════════════
+// KEYBOARD SHORTCUTS
+// ═══════════════════════════════════════════════════════════
+document.addEventListener('keydown',ev=>{
+  if(['INPUT','TEXTAREA'].includes(ev.target.tagName))return;
+  const k=ev.key;
+  if(k==='s'||k==='S')document.querySelector('[data-tool="select"]').click();
+  if(k==='p'||k==='P')document.querySelector('[data-tool="place"]').click();
+  if(k==='t'||k==='T')document.querySelector('[data-tool="transition"]').click();
+  if(k==='a'||k==='A')document.querySelector('[data-tool="arc"]').click();
+  if(k==='d'||k==='D')document.querySelector('[data-tool="delete"]').click();
+  if(k===' '){ev.preventDefault();simStep();}
+  if(k==='r'||k==='R')simReset();
+  if(k==='g'||k==='G'){S.snap=!S.snap;document.getElementById('snap-chk').checked=S.snap;document.getElementById('sb-snap').querySelector('.sb-val').textContent=S.snap?'ON':'OFF';}
+  if(k==='f'||k==='F')fitToScreen();
+  if(k==='+'||k==='=')zoomAt(document.getElementById('canvas-wrap').clientWidth/2,document.getElementById('canvas-wrap').clientHeight/2,1.15);
+  if(k==='-')zoomAt(document.getElementById('canvas-wrap').clientWidth/2,document.getElementById('canvas-wrap').clientHeight/2,0.87);
+  if(k==='?')document.getElementById('btn-help').click();
+  if(k==='Escape'){clearArcDraw();S.selected=null;closeCtxMenu();render();}
+  if(k==='Delete'||k==='Backspace'){if(S.selected)execCmd(Cmd.deleteNode(S.selected.type,S.selected.id));}
+  if(k==='z'&&(ev.ctrlKey||ev.metaKey)&&!ev.shiftKey){ev.preventDefault();undo();}
+  if((k==='z'&&ev.shiftKey&&(ev.ctrlKey||ev.metaKey))||(k==='y'&&(ev.ctrlKey||ev.metaKey))){ev.preventDefault();redo();}
+});
+
+// ═══════════════════════════════════════════════════════════
+// AUTOSAVE to localStorage
+// ═══════════════════════════════════════════════════════════
+function autosave() {
+  try { localStorage.setItem('cpntool-state',serializeCPN()); } catch(e){}
+}
+setInterval(autosave,15000);
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+function init() {
+  log('CPN Tool — Professional Edition ready','system');
+  log('Press ? for keyboard shortcuts','system');
+  // Try to restore autosaved state
+  let saved=null;
+  try {
+    const raw=localStorage.getItem('cpntool-state');
+    if(raw && typeof raw==='string' && raw.includes('place') && raw.length<500000) saved=raw;
+  } catch(e){}
+  const src=saved||EXAMPLES.producer;
+  loadFromText(src);
+  applyTransform();
+}
+init();
+</script>
+</body>
+</html>
