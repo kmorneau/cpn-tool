@@ -2471,37 +2471,53 @@ function idef0ElbowPath(src, srcRef, tgt, tgtRef, bend) {
   }
 
   const srcParsed = idef0ParseRef(srcRef);
+  const tgtParsed = idef0ParseRef(tgtRef);
   const srcSide   = srcParsed?.kind === 'box' ? srcParsed.side : null;
+  const tgtSide   = tgtParsed?.kind === 'box' ? tgtParsed.side : null;
 
   let mx1, my1, mx2, my2;
   const midX = (sx + tx) / 2;
   const midY = (sy + ty) / 2;
 
   if (srcSide === 'right' || srcSide === 'left') {
+    // exits horizontally → go horizontal to midX, then vertical
     mx1 = midX; my1 = sy;
     mx2 = midX; my2 = ty;
   } else if (srcSide === 'top' || srcSide === 'bottom') {
+    // exits vertically → go vertical to midY, then horizontal
     mx1 = sx; my1 = midY;
     mx2 = tx; my2 = midY;
+  } else if (tgtSide === 'top' || tgtSide === 'bottom') {
+    // EDGE → box top/bottom: arrive vertically → go vertical first, then horizontal
+    mx1 = sx; my1 = midY;
+    mx2 = tx; my2 = midY;
+  } else if (tgtSide === 'left' || tgtSide === 'right') {
+    // EDGE → box left/right: arrive horizontally → go horizontal first, then vertical
+    mx1 = midX; my1 = sy;
+    mx2 = midX; my2 = ty;
   } else {
-    mx1 = tx; my1 = sy;
-    mx2 = tx; my2 = ty;
+    // EDGE → EDGE: straight line via midpoint
+    mx1 = midX; my1 = sy;
+    mx2 = midX; my2 = ty;
   }
 
   return `M ${sx.toFixed(1)},${sy.toFixed(1)} L ${mx1.toFixed(1)},${my1.toFixed(1)} L ${mx2.toFixed(1)},${my2.toFixed(1)} L ${tx.toFixed(1)},${ty.toFixed(1)}`;
 }
 
-// Compute the default bend midpoint for an arrow (used for placing the bend handle)
-function idef0DefaultBend(src, srcRef, tgt) {
+// Compute the default bend midpoint for an arrow (used for placing the bend handle).
+// Mirrors the routing logic in idef0ElbowPath so the handle sits on the actual path.
+function idef0DefaultBend(src, srcRef, tgt, tgtRef) {
   const sx = src.x, sy = src.y, tx = tgt.x, ty = tgt.y;
   const srcParsed = idef0ParseRef(srcRef);
-  const srcSide   = srcParsed?.kind === 'box' ? srcParsed.side : null;
-  if (srcSide === 'right' || srcSide === 'left') {
-    return { x: (sx + tx) / 2, y: (sy + ty) / 2 };
-  } else if (srcSide === 'top' || srcSide === 'bottom') {
-    return { x: (sx + tx) / 2, y: (sy + ty) / 2 };
-  }
-  return { x: tx, y: (sy + ty) / 2 };
+  const tgtParsed = tgtRef ? idef0ParseRef(tgtRef) : null;
+  const srcSide = srcParsed?.kind === 'box' ? srcParsed.side : null;
+  const tgtSide = tgtParsed?.kind === 'box' ? tgtParsed.side : null;
+  const midX = (sx + tx) / 2, midY = (sy + ty) / 2;
+  if (srcSide === 'right' || srcSide === 'left')  return { x: midX, y: midY };
+  if (srcSide === 'top'   || srcSide === 'bottom') return { x: midX, y: midY };
+  if (tgtSide === 'top'   || tgtSide === 'bottom') return { x: sx,   y: midY };
+  if (tgtSide === 'left'  || tgtSide === 'right')  return { x: midX, y: sy   };
+  return { x: midX, y: midY };
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2662,7 +2678,7 @@ function renderIDEF0Arrows() {
 
     // Label near midpoint / bend
     if (arrow.label) {
-      const bend = arrow.bend || idef0DefaultBend(srcPt, arrow.src, tgtPt);
+      const bend = arrow.bend || idef0DefaultBend(srcPt, arrow.src, tgtPt, arrow.tgt);
       const lbl = document.createElementNS(SVG_NS, 'text');
       lbl.setAttribute('x', bend.x);
       lbl.setAttribute('y', bend.y - 7);
@@ -2696,7 +2712,7 @@ function renderIDEF0Arrows() {
       });
 
       // Bend handle — at current bend or computed default midpoint
-      const bendPt = arrow.bend || idef0DefaultBend(srcPt, arrow.src, tgtPt);
+      const bendPt = arrow.bend || idef0DefaultBend(srcPt, arrow.src, tgtPt, arrow.tgt);
       const bh = document.createElementNS(SVG_NS, 'rect');
       bh.setAttribute('x', bendPt.x - HANDLE_R); bh.setAttribute('y', bendPt.y - HANDLE_R);
       bh.setAttribute('width', HANDLE_R * 2);     bh.setAttribute('height', HANDLE_R * 2);
@@ -2807,7 +2823,7 @@ function idef0StartBendDrag(ev, arrow) {
   const startX = ev.clientX, startY = ev.clientY;
   const srcPt  = idef0RefPoint(arrow.src);
   const tgtPt  = idef0RefPoint(arrow.tgt);
-  const initial = arrow.bend || idef0DefaultBend(srcPt, arrow.src, tgtPt);
+  const initial = arrow.bend || idef0DefaultBend(srcPt, arrow.src, tgtPt, arrow.tgt);
   const ox = initial.x, oy = initial.y;
 
   function onMove(e) {
