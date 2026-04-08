@@ -687,10 +687,10 @@ input, textarea, select { font-family: var(--mono); color: var(--text); backgrou
             <div class="prop-row">
               <div class="prop-lbl">Role</div>
               <select class="prop-inp" id="ip-arr-role">
-                <option value="i">Input (I) — left</option>
-                <option value="c">Control (C) — top</option>
-                <option value="o">Output (O) — right</option>
-                <option value="m">Mechanism (M) — bottom</option>
+                <option value="i">Input (I) — top</option>
+                <option value="c">Control (C) — left</option>
+                <option value="o">Output (O) — bottom</option>
+                <option value="m">Mechanism (M) — right</option>
               </select>
             </div>
             <div class="prop-row">
@@ -873,10 +873,10 @@ input, textarea, select { font-family: var(--mono); color: var(--text); backgrou
     <div class="modal-row">
       <div class="modal-lbl">Role</div>
       <select class="modal-inp" id="m-idef0-role">
-        <option value="i">Input (I) — enters from left</option>
-        <option value="c">Control (C) — enters from top</option>
-        <option value="o">Output (O) — exits from right</option>
-        <option value="m">Mechanism (M) — enters from bottom</option>
+        <option value="i">Input (I) — enters from top</option>
+        <option value="c">Control (C) — enters from left</option>
+        <option value="o">Output (O) — exits from bottom</option>
+        <option value="m">Mechanism (M) — exits from right</option>
       </select>
     </div>
     <div class="modal-row">
@@ -2961,10 +2961,10 @@ function createPortPlaces(boxId) {
     const role = arrow.role || 'i';
     const idx  = roleCounts[role]++;
     let px, py;
-    if (role === 'i')      { px = 100;              py = 150 + idx * spacing; }
-    else if (role === 'c') { px = 200 + idx * spacing; py = 80; }
-    else if (role === 'o') { px = 700;              py = 150 + idx * spacing; }
-    else                   { px = 200 + idx * spacing; py = 480; }
+    if (role === 'i')      { px = 200 + idx * spacing; py = 80;  }   // top
+    else if (role === 'c') { px = 100;              py = 150 + idx * spacing; } // left
+    else if (role === 'o') { px = 200 + idx * spacing; py = 480; }  // bottom
+    else                   { px = 700; py = 150 + idx * spacing; }   // right (mechanism)
 
     const placeId = 'P' + (++S.nc);
     S.places.push({
@@ -3042,18 +3042,24 @@ function loadIDEF0Example() {
     { id: 'B3', label: 'Fulfill Order',   desc: 'Pick, pack & ship',   x: 600, y: 160, w: 180, h: 100, cpnData: null },
   ];
   IDEF0.arrows = [
-    { id: 'A1',  src: 'EDGE:30:210',     tgt: 'BOX:B1:left',   role: 'i', label: 'Customer Order',  colorSet: 'ORDER'  },
-    { id: 'A2',  src: 'BOX:B1:right',    tgt: 'BOX:B2:left',   role: 'i', label: 'Validated Order', colorSet: 'ORDER'  },
-    { id: 'A3',  src: 'BOX:B2:right',    tgt: 'BOX:B3:left',   role: 'i', label: 'Paid Order',      colorSet: 'ORDER'  },
-    { id: 'A4',  src: 'BOX:B3:right',    tgt: 'EDGE:830:210',  role: 'o', label: 'Shipped Order',   colorSet: 'ORDER'  },
-    { id: 'A5',  src: 'EDGE:170:60',     tgt: 'BOX:B1:top',    role: 'c', label: 'Business Rules',  colorSet: 'RULE'   },
-    { id: 'A6',  src: 'EDGE:430:60',     tgt: 'BOX:B2:top',    role: 'c', label: 'Payment Policy',  colorSet: 'RULE'   },
-    { id: 'A7',  src: 'EDGE:690:60',     tgt: 'BOX:B3:top',    role: 'c', label: 'Shipping Policy', colorSet: 'RULE'   },
-    { id: 'A8',  src: 'EDGE:170:310',    tgt: 'BOX:B1:bottom', role: 'm', label: 'Staff',           colorSet: 'PERSON' },
-    { id: 'A9',  src: 'EDGE:430:310',    tgt: 'BOX:B2:bottom', role: 'm', label: 'Payment System',  colorSet: 'SYSTEM' },
-    { id: 'A10', src: 'EDGE:690:310',    tgt: 'BOX:B3:bottom', role: 'm', label: 'Warehouse',       colorSet: 'PLACE'  },
+    // Input (I) — enters from top (blue)
+    { id: 'A1',  src: 'EDGE:170:40',     tgt: 'BOX:B1:top',    role: 'i', label: 'Customer Order',  colorSet: 'ORDER'  },
+    { id: 'A2',  src: 'EDGE:430:40',     tgt: 'BOX:B2:top',    role: 'i', label: 'Validated Order', colorSet: 'ORDER'  },
+    { id: 'A3',  src: 'EDGE:690:40',     tgt: 'BOX:B3:top',    role: 'i', label: 'Paid Order',      colorSet: 'ORDER'  },
+    // Control (C) — enters from left (amber)
+    { id: 'A4',  src: 'EDGE:30:210',     tgt: 'BOX:B1:left',   role: 'c', label: 'Business Rules',  colorSet: 'RULE'   },
+    { id: 'A5',  src: 'EDGE:290:210',    tgt: 'BOX:B2:left',   role: 'c', label: 'Payment Policy',  colorSet: 'RULE'   },
+    { id: 'A6',  src: 'EDGE:550:210',    tgt: 'BOX:B3:left',   role: 'c', label: 'Shipping Policy', colorSet: 'RULE'   },
+    // Output (O) — exits from bottom (green)
+    { id: 'A7',  src: 'BOX:B1:bottom',   tgt: 'EDGE:170:380',  role: 'o', label: 'Order Record',    colorSet: 'ORDER'  },
+    { id: 'A8',  src: 'BOX:B2:bottom',   tgt: 'EDGE:430:380',  role: 'o', label: 'Payment Conf.',   colorSet: 'CONF'   },
+    { id: 'A9',  src: 'BOX:B3:bottom',   tgt: 'EDGE:690:380',  role: 'o', label: 'Shipped Order',   colorSet: 'ORDER'  },
+    // Mechanism (M) — exits from right (purple)
+    { id: 'A10', src: 'BOX:B1:right',    tgt: 'BOX:B2:left',   role: 'm', label: 'Staff',           colorSet: 'PERSON' },
+    { id: 'A11', src: 'BOX:B2:right',    tgt: 'BOX:B3:left',   role: 'm', label: 'Payment System',  colorSet: 'SYSTEM' },
+    { id: 'A12', src: 'BOX:B3:right',    tgt: 'EDGE:830:210',  role: 'm', label: 'Warehouse',       colorSet: 'PLACE'  },
   ];
-  IDEF0.nc = 3; IDEF0.ac = 10;
+  IDEF0.nc = 3; IDEF0.ac = 12;
   renderIDEF0();
   log('IDEF0 example loaded', 'system');
 }
