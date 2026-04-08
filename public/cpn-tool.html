@@ -3212,7 +3212,7 @@ document.getElementById('btn-save-as-model').addEventListener('click', async () 
 });
 
 document.getElementById('btn-logout').addEventListener('click', async () => {
-  await cloudSave();
+  await Promise.all([cloudSave(), idef0CloudSave()]);
   await fetch('/auth/logout', { method: 'POST' });
   window.location.href = '/login';
 });
