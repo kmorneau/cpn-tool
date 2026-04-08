@@ -156,7 +156,7 @@ input, textarea, select { font-family: var(--mono); color: var(--text); backgrou
   flex-shrink: 0;
 }
 /* Tool palette */
-#tool-palette { padding: 8px; display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
+#tool-palette { padding: 8px; flex-shrink: 0; }
 .tool-btn {
   padding: 6px 10px; border: 1px solid var(--border);
   border-radius: 4px; background: transparent; color: var(--text2);
@@ -463,6 +463,77 @@ input, textarea, select { font-family: var(--mono); color: var(--text); backgrou
   border-radius: 3px; padding: 4px 9px; font-size: 19px; color: var(--text);
   pointer-events: none; z-index: 600; display: none; white-space: nowrap;
 }
+
+/* ═══════════════════════════════════════════════
+   IDEF0 DIAGRAM
+═══════════════════════════════════════════════ */
+#idef0-wrap {
+  flex: 1; position: relative; overflow: auto;
+  background: var(--bg); cursor: default; display: none;
+}
+#idef0-wrap.mode-idef0 { display: block; }
+#idef0-wrap::-webkit-scrollbar { width: 10px; height: 10px; }
+#idef0-wrap::-webkit-scrollbar-track { background: var(--bg4); }
+#idef0-wrap::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 5px; }
+#idef0-wrap::-webkit-scrollbar-corner { background: var(--bg4); }
+#idef0-world {
+  position: relative; min-width: 100%; min-height: 100%;
+}
+#idef0-world::before {
+  content: ''; position: absolute; inset: 0;
+  background-image: radial-gradient(circle, #0e2540 1px, transparent 1px);
+  background-size: 24px 24px; pointer-events: none; z-index: 0;
+}
+#idef0-svg {
+  position: absolute; top: 0; left: 0;
+  width: 100%; height: 100%; overflow: visible;
+}
+
+/* Breadcrumb bar */
+#breadcrumb {
+  height: 28px; background: var(--bg4);
+  border-bottom: 1px solid var(--border);
+  display: none; align-items: center;
+  padding: 0 14px; gap: 8px; font-size: 14px;
+  color: var(--text3); flex-shrink: 0;
+}
+#breadcrumb.visible { display: flex; }
+.bc-link { color: var(--enabled); cursor: pointer; text-decoration: underline; }
+.bc-sep { color: var(--text3); }
+.bc-current { color: var(--text); }
+
+/* IDEF0 SVG element styles */
+.idef0-box { fill: var(--bg3); stroke: #1e4a7e; stroke-width: 1.8; }
+.idef0-box.sel { stroke: #e2e8f0; stroke-width: 2.5; }
+.idef0-box.has-cpn { stroke: var(--place); }
+.idef0-box-lbl { font-size: 14px; font-weight: 700; fill: var(--text); font-family: 'IBM Plex Mono', monospace; }
+.idef0-box-desc { font-size: 12px; fill: var(--text3); font-family: 'IBM Plex Mono', monospace; }
+.idef0-box-num { font-size: 11px; fill: var(--text3); font-family: 'IBM Plex Mono', monospace; }
+.idef0-drill { font-size: 11px; fill: var(--enabled); font-family: 'IBM Plex Mono', monospace; cursor: pointer; }
+
+.idef0-arrow { fill: none; stroke-width: 1.5; }
+.idef0-arrow.role-i { stroke: #3b82f6; }
+.idef0-arrow.role-c { stroke: #f59e0b; }
+.idef0-arrow.role-o { stroke: #22c55e; }
+.idef0-arrow.role-m { stroke: #a855f7; }
+.idef0-arrow.sel { stroke-width: 2.5; }
+.idef0-arrow-lbl { font-size: 12px; font-family: 'IBM Plex Mono', monospace; font-style: italic; }
+.idef0-arrow-lbl.role-i { fill: #3b82f6; }
+.idef0-arrow-lbl.role-c { fill: #f59e0b; }
+.idef0-arrow-lbl.role-o { fill: #22c55e; }
+.idef0-arrow-lbl.role-m { fill: #a855f7; }
+
+.idef0-port { fill: none; stroke-width: 1.5; r: 4; }
+.idef0-port.role-i { stroke: #3b82f6; fill: #0a1a3a; }
+.idef0-port.role-c { stroke: #f59e0b; fill: #1a1000; }
+.idef0-port.role-o { stroke: #22c55e; fill: #001a0a; }
+.idef0-port.role-m { stroke: #a855f7; fill: #0a001a; }
+
+/* IDEF0 tool buttons in left panel */
+.idef0-tools { display: none; }
+.idef0-tools.mode-idef0 { display: flex; flex-direction: column; gap: 4px; padding: 8px; }
+.cpn-tools { display: flex; flex-direction: column; gap: 4px; }
+.cpn-tools.mode-idef0 { display: none; }
 </style>
 </head>
 <body>
@@ -474,6 +545,7 @@ input, textarea, select { font-family: var(--mono); color: var(--text); backgrou
   <div id="mode-tabs">
     <button class="mode-tab active" data-mode="visual">◈ Visual</button>
     <button class="mode-tab" data-mode="text">⌨ Text</button>
+    <button class="mode-tab" data-mode="idef0">⬡ IDEF0</button>
   </div>
 
   <div id="sim-controls">
@@ -513,12 +585,20 @@ input, textarea, select { font-family: var(--mono); color: var(--text); backgrou
   <!-- LEFT -->
   <div id="left-panel">
     <div class="panel-hdr">Tools</div>
-    <div id="tool-palette">
+    <!-- CPN tools (shown in visual/text mode) -->
+    <div id="tool-palette" class="cpn-tools">
       <button class="tool-btn active" data-tool="select"><span class="tool-icon">↖</span>Select / Move<span class="tool-key">S</span></button>
       <button class="tool-btn" data-tool="place"><span class="tool-icon">◉</span>Add Place<span class="tool-key">P</span></button>
       <button class="tool-btn" data-tool="transition"><span class="tool-icon">▬</span>Add Transition<span class="tool-key">T</span></button>
       <button class="tool-btn" data-tool="arc"><span class="tool-icon">→</span>Draw Arc<span class="tool-key">A</span></button>
       <button class="tool-btn" data-tool="delete"><span class="tool-icon">✕</span>Delete<span class="tool-key">D</span></button>
+    </div>
+    <!-- IDEF0 tools (shown in idef0 mode) -->
+    <div class="idef0-tools" id="idef0-tool-palette">
+      <button class="tool-btn active" data-idef0-tool="select"><span class="tool-icon">↖</span>Select / Move<span class="tool-key">S</span></button>
+      <button class="tool-btn" data-idef0-tool="box"><span class="tool-icon">⬡</span>Add Box<span class="tool-key">B</span></button>
+      <button class="tool-btn" data-idef0-tool="arrow"><span class="tool-icon">→</span>Draw Arrow<span class="tool-key">A</span></button>
+      <button class="tool-btn" data-idef0-tool="delete"><span class="tool-icon">✕</span>Delete<span class="tool-key">D</span></button>
     </div>
 
     <div class="panel-hdr" style="margin-top:2px">Examples</div>
@@ -570,6 +650,13 @@ input, textarea, select { font-family: var(--mono); color: var(--text); backgrou
 
   <!-- CENTER -->
   <div id="center">
+    <!-- Breadcrumb bar (shown when drilling into a box CPN) -->
+    <div id="breadcrumb">
+      <span class="bc-link" id="bc-idef0">IDEF0</span>
+      <span class="bc-sep">›</span>
+      <span class="bc-current" id="bc-box"></span>
+    </div>
+
     <!-- Canvas -->
     <div id="canvas-wrap">
       <div id="canvas-world">
@@ -615,6 +702,33 @@ input, textarea, select { font-family: var(--mono); color: var(--text); backgrou
         </div>
       </div>
       <div id="err-bar"></div>
+    </div>
+
+    <!-- IDEF0 canvas -->
+    <div id="idef0-wrap">
+      <div id="idef0-world">
+        <svg id="idef0-svg" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="idef0-arr-i" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+              <path d="M0,0 L0,8 L10,4 z" fill="#3b82f6"/>
+            </marker>
+            <marker id="idef0-arr-c" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+              <path d="M0,0 L0,8 L10,4 z" fill="#f59e0b"/>
+            </marker>
+            <marker id="idef0-arr-o" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+              <path d="M0,0 L0,8 L10,4 z" fill="#22c55e"/>
+            </marker>
+            <marker id="idef0-arr-m" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+              <path d="M0,0 L0,8 L10,4 z" fill="#a855f7"/>
+            </marker>
+          </defs>
+          <g id="idef0-root">
+            <g id="idef0-arrows-layer"></g>
+            <g id="idef0-boxes-layer"></g>
+            <g id="idef0-preview-layer"></g>
+          </g>
+        </svg>
+      </div>
     </div>
   </div>
 
@@ -690,6 +804,45 @@ input, textarea, select { font-family: var(--mono); color: var(--text); backgrou
     <div class="modal-btns">
       <button class="modal-btn" id="m-cancel">Cancel</button>
       <button class="modal-btn ok" id="m-ok">Apply</button>
+    </div>
+  </div>
+  <div class="modal" id="idef0-arrow-modal" style="display:none">
+    <h3>IDEF0 Arrow</h3>
+    <div class="modal-row">
+      <div class="modal-lbl">Label</div>
+      <input class="modal-inp" id="m-idef0-label" placeholder="e.g. Data Request">
+    </div>
+    <div class="modal-row">
+      <div class="modal-lbl">Role</div>
+      <select class="modal-inp" id="m-idef0-role">
+        <option value="i">Input (I) — enters from left</option>
+        <option value="c">Control (C) — enters from top</option>
+        <option value="o">Output (O) — exits from right</option>
+        <option value="m">Mechanism (M) — enters from bottom</option>
+      </select>
+    </div>
+    <div class="modal-row">
+      <div class="modal-lbl">Color Set</div>
+      <input class="modal-inp" id="m-idef0-cs" placeholder="e.g. DATA">
+    </div>
+    <div class="modal-btns">
+      <button class="modal-btn" id="m-idef0-cancel">Cancel</button>
+      <button class="modal-btn ok" id="m-idef0-ok">Apply</button>
+    </div>
+  </div>
+  <div class="modal" id="idef0-box-modal" style="display:none">
+    <h3>Activity Box</h3>
+    <div class="modal-row">
+      <div class="modal-lbl">Label</div>
+      <input class="modal-inp" id="m-idef0-box-label" placeholder="e.g. Process Orders">
+    </div>
+    <div class="modal-row">
+      <div class="modal-lbl">Description</div>
+      <input class="modal-inp" id="m-idef0-box-desc" placeholder="Brief description...">
+    </div>
+    <div class="modal-btns">
+      <button class="modal-btn" id="m-idef0-box-cancel">Cancel</button>
+      <button class="modal-btn ok" id="m-idef0-box-ok">Apply</button>
     </div>
   </div>
   <div class="modal" id="help-modal" style="display:none;width:500px">
@@ -818,6 +971,23 @@ const S = {
   // Context menu target
   ctxTarget: null,
 };
+
+// ═══════════════════════════════════════════════════════════
+// IDEF0 STATE
+// ═══════════════════════════════════════════════════════════
+const IDEF0 = {
+  boxes: [],       // { id, label, desc, x, y, w, h, cpnData }
+  arrows: [],      // { id, src, srcSide, tgt, tgtSide, role, label, colorSet }
+  selected: null,  // { type: 'box'|'arrow', id }
+  tool: 'select',  // 'select' | 'box' | 'arrow' | 'delete'
+  nc: 0, ac: 0,
+  // Arrow drawing state
+  arrowSrc: null,  // { ref: 'BOX:id:side' | 'EDGE:x:y', x, y }
+  // Navigation
+  activeBox: null, // boxId when drilling into a box's CPN, null at top level
+  _exampleLoaded: false,
+};
+const IDEF0_BOX_W = 200, IDEF0_BOX_H = 120;
 
 // ═══════════════════════════════════════════════════════════
 // EXAMPLES
@@ -1989,14 +2159,692 @@ function applyText() {
 // MODE SWITCHING
 // ═══════════════════════════════════════════════════════════
 function switchMode(mode) {
-  S.mode=mode;
-  document.querySelectorAll('.mode-tab').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
-  document.getElementById('canvas-wrap').style.display=mode==='visual'?'':'none';
-  document.getElementById('editor-wrap').style.display=mode==='text'?'flex':'none';
-  if(mode==='text'){ed.value=serializeCPN();updateHL();}
-  else{applyText();render();}
+  S.mode = mode;
+  document.querySelectorAll('.mode-tab').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+
+  const canvasWrap   = document.getElementById('canvas-wrap');
+  const editorWrap   = document.getElementById('editor-wrap');
+  const idef0Wrap    = document.getElementById('idef0-wrap');
+  const simControls  = document.getElementById('sim-controls');
+  const cpnTools     = document.getElementById('tool-palette');
+  const idef0Tools   = document.getElementById('idef0-tool-palette');
+
+  if (mode === 'idef0') {
+    canvasWrap.style.display  = 'none';
+    editorWrap.style.display  = 'none';
+    idef0Wrap.classList.add('mode-idef0');
+    simControls.style.display = 'none';
+    cpnTools.classList.add('mode-idef0');
+    idef0Tools.classList.add('mode-idef0');
+    // Load example on first open if empty
+    if (!IDEF0._exampleLoaded && !IDEF0.boxes.length) {
+      IDEF0._exampleLoaded = true;
+      loadIDEF0Example();
+    } else {
+      renderIDEF0();
+    }
+    updateIDEF0StatusBar();
+  } else {
+    idef0Wrap.classList.remove('mode-idef0');
+    cpnTools.classList.remove('mode-idef0');
+    idef0Tools.classList.remove('mode-idef0');
+    simControls.style.display = '';
+
+    if (mode === 'text') {
+      canvasWrap.style.display = 'none';
+      editorWrap.style.display = 'flex';
+      ed.value = serializeCPN();
+      updateHL();
+    } else {
+      // visual mode
+      canvasWrap.style.display = '';
+      editorWrap.style.display = 'none';
+      // Only parse text editor if coming from text mode or no existing model data
+      // (When coming from IDEF0 drill-down, S.places is already set — skip applyText)
+      if (!switchMode._skipApplyText) {
+        applyText();
+      }
+      switchMode._skipApplyText = false;
+      render();
+      applyTransform();
+    }
+  }
 }
-document.querySelectorAll('.mode-tab').forEach(b=>b.addEventListener('click',()=>switchMode(b.dataset.mode)));
+switchMode._skipApplyText = false;
+document.querySelectorAll('.mode-tab').forEach(b => b.addEventListener('click', () => {
+  const mode = b.dataset.mode;
+  // When leaving idef0 via tab (not breadcrumb), clear activeBox
+  if (S.mode === 'idef0' && mode !== 'idef0') {
+    // Do nothing special — normal switch
+  }
+  switchMode(mode);
+}));
+
+// ═══════════════════════════════════════════════════════════
+// IDEF0 — HELPERS
+// ═══════════════════════════════════════════════════════════
+function idef0FindBox(id)   { return IDEF0.boxes.find(b => b.id === id); }
+function idef0FindArrow(id) { return IDEF0.arrows.find(a => a.id === id); }
+
+function idef0BoxPort(boxId, side) {
+  const b = idef0FindBox(boxId);
+  if (!b) return { x: 0, y: 0 };
+  switch (side) {
+    case 'left':   return { x: b.x,           y: b.y + b.h / 2 };
+    case 'right':  return { x: b.x + b.w,     y: b.y + b.h / 2 };
+    case 'top':    return { x: b.x + b.w / 2, y: b.y };
+    case 'bottom': return { x: b.x + b.w / 2, y: b.y + b.h };
+    default:       return { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+  }
+}
+
+function idef0ParseRef(ref) {
+  if (!ref) return null;
+  if (ref.startsWith('BOX:')) {
+    const parts = ref.split(':'); // BOX:id:side
+    return { kind: 'box', boxId: parts[1], side: parts[2] };
+  }
+  if (ref.startsWith('EDGE:')) {
+    const parts = ref.split(':'); // EDGE:x:y
+    return { kind: 'edge', x: parseFloat(parts[1]), y: parseFloat(parts[2]) };
+  }
+  return null;
+}
+
+function idef0RefPoint(ref) {
+  const p = idef0ParseRef(ref);
+  if (!p) return { x: 0, y: 0 };
+  if (p.kind === 'box')  return idef0BoxPort(p.boxId, p.side);
+  if (p.kind === 'edge') return { x: p.x, y: p.y };
+  return { x: 0, y: 0 };
+}
+
+// Build an orthogonal (elbow) path between two points with source/target sides
+function idef0ElbowPath(src, srcRef, tgt, tgtRef) {
+  const sx = src.x, sy = src.y, tx = tgt.x, ty = tgt.y;
+  const srcParsed = idef0ParseRef(srcRef);
+  const tgtParsed = idef0ParseRef(tgtRef);
+
+  // Determine exit/enter directions
+  const srcSide  = srcParsed?.kind === 'box' ? srcParsed.side : null;
+  const tgtSide  = tgtParsed?.kind === 'box' ? tgtParsed.side : null;
+
+  // Simple L-shape or S-shape routing
+  let mx1, my1, mx2, my2;
+  const midX = (sx + tx) / 2;
+  const midY = (sy + ty) / 2;
+
+  if (srcSide === 'right' || srcSide === 'left') {
+    mx1 = midX; my1 = sy;
+    mx2 = midX; my2 = ty;
+  } else if (srcSide === 'top' || srcSide === 'bottom') {
+    mx1 = sx; my1 = midY;
+    mx2 = tx; my2 = midY;
+  } else {
+    // edge → box: go horizontal then vertical
+    mx1 = tx; my1 = sy;
+    mx2 = tx; my2 = ty;
+  }
+
+  return `M ${sx.toFixed(1)},${sy.toFixed(1)} L ${mx1.toFixed(1)},${my1.toFixed(1)} L ${mx2.toFixed(1)},${my2.toFixed(1)} L ${tx.toFixed(1)},${ty.toFixed(1)}`;
+}
+
+// ═══════════════════════════════════════════════════════════
+// IDEF0 — RENDERING
+// ═══════════════════════════════════════════════════════════
+function renderIDEF0() {
+  if (S.mode !== 'idef0') return;
+  renderIDEF0Arrows();
+  renderIDEF0Boxes();
+  syncIDEF0WorldSize();
+}
+
+function renderIDEF0Boxes() {
+  const layer = document.getElementById('idef0-boxes-layer');
+  if (!layer) return;
+  layer.innerHTML = '';
+  IDEF0.boxes.forEach((box, idx) => {
+    const isSel = IDEF0.selected?.type === 'box' && IDEF0.selected?.id === box.id;
+    const hasCPN = !!(box.cpnData && (box.cpnData.places?.length || box.cpnData.transitions?.length));
+    const g = document.createElementNS(SVG_NS, 'g');
+    g.setAttribute('data-idef0-box', box.id);
+    g.style.cursor = IDEF0.tool === 'delete' ? 'pointer' : 'default';
+
+    // Main rect
+    const rect = document.createElementNS(SVG_NS, 'rect');
+    rect.setAttribute('x', box.x);
+    rect.setAttribute('y', box.y);
+    rect.setAttribute('width', box.w);
+    rect.setAttribute('height', box.h);
+    rect.setAttribute('rx', '4');
+    rect.setAttribute('class', 'idef0-box' + (isSel ? ' sel' : '') + (hasCPN ? ' has-cpn' : ''));
+    g.appendChild(rect);
+
+    // Label (centered upper third)
+    const lblEl = document.createElementNS(SVG_NS, 'text');
+    lblEl.setAttribute('x', box.x + box.w / 2);
+    lblEl.setAttribute('y', box.y + box.h * 0.35);
+    lblEl.setAttribute('text-anchor', 'middle');
+    lblEl.setAttribute('class', 'idef0-box-lbl');
+    lblEl.textContent = box.label || '(unlabelled)';
+    g.appendChild(lblEl);
+
+    // Description
+    if (box.desc) {
+      const descEl = document.createElementNS(SVG_NS, 'text');
+      descEl.setAttribute('x', box.x + box.w / 2);
+      descEl.setAttribute('y', box.y + box.h * 0.55);
+      descEl.setAttribute('text-anchor', 'middle');
+      descEl.setAttribute('class', 'idef0-box-desc');
+      descEl.textContent = box.desc;
+      g.appendChild(descEl);
+    }
+
+    // Box number (A1, A2, ...) bottom-left
+    const numEl = document.createElementNS(SVG_NS, 'text');
+    numEl.setAttribute('x', box.x + 6);
+    numEl.setAttribute('y', box.y + box.h - 6);
+    numEl.setAttribute('class', 'idef0-box-num');
+    numEl.textContent = 'A' + (idx + 1);
+    g.appendChild(numEl);
+
+    // Drill link bottom-right
+    const drillEl = document.createElementNS(SVG_NS, 'text');
+    drillEl.setAttribute('x', box.x + box.w - 6);
+    drillEl.setAttribute('y', box.y + box.h - 6);
+    drillEl.setAttribute('text-anchor', 'end');
+    drillEl.setAttribute('class', 'idef0-drill');
+    drillEl.textContent = hasCPN ? '▶ CPN' : '+ CPN';
+    drillEl.addEventListener('click', ev => { ev.stopPropagation(); idef0DrillDown(box.id); });
+    g.appendChild(drillEl);
+
+    // Port dots on each side midpoint
+    [
+      { side: 'left',   cx: box.x,           cy: box.y + box.h / 2 },
+      { side: 'right',  cx: box.x + box.w,   cy: box.y + box.h / 2 },
+      { side: 'top',    cx: box.x + box.w/2,  cy: box.y },
+      { side: 'bottom', cx: box.x + box.w/2,  cy: box.y + box.h },
+    ].forEach(({ side, cx, cy }) => {
+      const dot = document.createElementNS(SVG_NS, 'circle');
+      dot.setAttribute('cx', cx);
+      dot.setAttribute('cy', cy);
+      dot.setAttribute('r', '5');
+      dot.setAttribute('fill', 'none');
+      dot.setAttribute('stroke', '#2a5580');
+      dot.setAttribute('stroke-width', '1.5');
+      dot.style.cursor = 'crosshair';
+      dot.addEventListener('click', ev => {
+        ev.stopPropagation();
+        idef0HandlePortClick('BOX:' + box.id + ':' + side, cx, cy);
+      });
+      g.appendChild(dot);
+    });
+
+    // Box interaction events
+    g.addEventListener('mousedown', ev => {
+      if (ev.button !== 0) return;
+      if (IDEF0.tool === 'delete') {
+        ev.stopPropagation();
+        idef0DeleteBox(box.id);
+        return;
+      }
+      if (IDEF0.tool === 'select') {
+        ev.stopPropagation();
+        IDEF0.selected = { type: 'box', id: box.id };
+        idef0StartDrag(ev, box);
+        renderIDEF0();
+      }
+    });
+    g.addEventListener('dblclick', ev => {
+      ev.stopPropagation();
+      if (IDEF0.tool === 'select') idef0DrillDown(box.id);
+    });
+
+    layer.appendChild(g);
+  });
+}
+
+function renderIDEF0Arrows() {
+  const layer = document.getElementById('idef0-arrows-layer');
+  if (!layer) return;
+  layer.innerHTML = '';
+
+  IDEF0.arrows.forEach(arrow => {
+    const isSel = IDEF0.selected?.type === 'arrow' && IDEF0.selected?.id === arrow.id;
+    const role = arrow.role || 'i';
+    const markerId = 'idef0-arr-' + role;
+
+    const srcPt = idef0RefPoint(arrow.src);
+    const tgtPt = idef0RefPoint(arrow.tgt);
+    const d = idef0ElbowPath(srcPt, arrow.src, tgtPt, arrow.tgt);
+
+    const g = document.createElementNS(SVG_NS, 'g');
+    g.setAttribute('data-idef0-arrow', arrow.id);
+
+    // Path
+    const path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('d', d);
+    path.setAttribute('class', `idef0-arrow role-${role}` + (isSel ? ' sel' : ''));
+    path.setAttribute('marker-end', `url(#${markerId})`);
+    g.appendChild(path);
+
+    // Hit area
+    const hit = document.createElementNS(SVG_NS, 'path');
+    hit.setAttribute('d', d);
+    hit.setAttribute('stroke', 'transparent');
+    hit.setAttribute('stroke-width', '12');
+    hit.setAttribute('fill', 'none');
+    hit.style.cursor = 'pointer';
+    hit.addEventListener('click', ev => {
+      ev.stopPropagation();
+      if (IDEF0.tool === 'delete') { idef0DeleteArrow(arrow.id); return; }
+      IDEF0.selected = { type: 'arrow', id: arrow.id };
+      renderIDEF0();
+    });
+    g.appendChild(hit);
+
+    // Label near midpoint
+    if (arrow.label) {
+      // Find midpoint of path (approximate: midpoint of src→tgt line)
+      const mx = (srcPt.x + tgtPt.x) / 2;
+      const my = (srcPt.y + tgtPt.y) / 2;
+      const lbl = document.createElementNS(SVG_NS, 'text');
+      lbl.setAttribute('x', mx);
+      lbl.setAttribute('y', my - 6);
+      lbl.setAttribute('text-anchor', 'middle');
+      lbl.setAttribute('class', `idef0-arrow-lbl role-${role}`);
+      lbl.textContent = arrow.label;
+      g.appendChild(lbl);
+    }
+
+    layer.appendChild(g);
+  });
+}
+
+function syncIDEF0WorldSize() {
+  const world = document.getElementById('idef0-world');
+  const wrap  = document.getElementById('idef0-wrap');
+  if (!world || !wrap) return;
+  const W = wrap.clientWidth || 800;
+  const H = wrap.clientHeight || 500;
+  if (!IDEF0.boxes.length) {
+    world.style.width = W + 'px'; world.style.height = H + 'px'; return;
+  }
+  let maxX = W, maxY = H;
+  IDEF0.boxes.forEach(b => {
+    maxX = Math.max(maxX, b.x + b.w + 120);
+    maxY = Math.max(maxY, b.y + b.h + 120);
+  });
+  IDEF0.arrows.forEach(a => {
+    const sp = idef0RefPoint(a.src), tp = idef0RefPoint(a.tgt);
+    maxX = Math.max(maxX, sp.x + 40, tp.x + 40);
+    maxY = Math.max(maxY, sp.y + 40, tp.y + 40);
+  });
+  world.style.width  = maxX + 'px';
+  world.style.height = maxY + 'px';
+}
+
+// ═══════════════════════════════════════════════════════════
+// IDEF0 — DRAG (box move)
+// ═══════════════════════════════════════════════════════════
+let idef0Drag = null;
+
+function idef0StartDrag(ev, box) {
+  const wrap = document.getElementById('idef0-wrap');
+  const rect = wrap.getBoundingClientRect();
+  idef0Drag = {
+    box,
+    startMouseX: ev.clientX,
+    startMouseY: ev.clientY,
+    startBoxX: box.x,
+    startBoxY: box.y,
+    moved: false,
+  };
+  function onMove(e) {
+    if (!idef0Drag) return;
+    const dx = e.clientX - idef0Drag.startMouseX;
+    const dy = e.clientY - idef0Drag.startMouseY;
+    idef0Drag.box.x = snapGrid(idef0Drag.startBoxX + dx);
+    idef0Drag.box.y = snapGrid(idef0Drag.startBoxY + dy);
+    idef0Drag.moved = true;
+    renderIDEF0();
+  }
+  function onUp() {
+    idef0Drag = null;
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  }
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+}
+
+// ═══════════════════════════════════════════════════════════
+// IDEF0 — ARROW DRAWING
+// ═══════════════════════════════════════════════════════════
+function idef0HandlePortClick(ref, x, y) {
+  if (IDEF0.tool !== 'arrow') return;
+  if (!IDEF0.arrowSrc) {
+    IDEF0.arrowSrc = { ref, x, y };
+  } else {
+    if (IDEF0.arrowSrc.ref !== ref) {
+      // Create arrow, prompt for properties
+      const srcRef = IDEF0.arrowSrc.ref;
+      const tgtRef = ref;
+      IDEF0.arrowSrc = null;
+      document.getElementById('idef0-preview-layer').innerHTML = '';
+      openIDEF0ArrowModal(srcRef, tgtRef);
+    } else {
+      IDEF0.arrowSrc = null;
+      document.getElementById('idef0-preview-layer').innerHTML = '';
+    }
+  }
+}
+
+function openIDEF0ArrowModal(srcRef, tgtRef) {
+  document.getElementById('m-idef0-label').value = '';
+  document.getElementById('m-idef0-role').value  = 'i';
+  document.getElementById('m-idef0-cs').value    = '';
+
+  // Show arrow modal, hide others
+  document.getElementById('arc-modal').style.display       = 'none';
+  document.getElementById('help-modal').style.display      = 'none';
+  document.getElementById('idef0-arrow-modal').style.display = '';
+  document.getElementById('idef0-box-modal').style.display  = 'none';
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('m-idef0-label').focus();
+
+  function cleanup() {
+    document.getElementById('overlay').classList.remove('open');
+    document.getElementById('idef0-arrow-modal').style.display = 'none';
+    document.getElementById('m-idef0-ok').removeEventListener('click', onOk);
+    document.getElementById('m-idef0-cancel').removeEventListener('click', onCancel);
+  }
+  function onOk() {
+    const label    = document.getElementById('m-idef0-label').value.trim();
+    const role     = document.getElementById('m-idef0-role').value;
+    const colorSet = document.getElementById('m-idef0-cs').value.trim() || 'TOKEN';
+    const arrow = {
+      id: 'A' + (++IDEF0.ac),
+      src: srcRef, tgt: tgtRef,
+      role, label, colorSet,
+    };
+    IDEF0.arrows.push(arrow);
+    cleanup();
+    renderIDEF0();
+  }
+  function onCancel() { cleanup(); }
+  document.getElementById('m-idef0-ok').addEventListener('click', onOk, { once: true });
+  document.getElementById('m-idef0-cancel').addEventListener('click', onCancel, { once: true });
+}
+
+function openIDEF0BoxModal(box) {
+  document.getElementById('m-idef0-box-label').value = box.label || '';
+  document.getElementById('m-idef0-box-desc').value  = box.desc  || '';
+
+  document.getElementById('arc-modal').style.display         = 'none';
+  document.getElementById('help-modal').style.display        = 'none';
+  document.getElementById('idef0-arrow-modal').style.display = 'none';
+  document.getElementById('idef0-box-modal').style.display   = '';
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('m-idef0-box-label').focus();
+
+  function cleanup() {
+    document.getElementById('overlay').classList.remove('open');
+    document.getElementById('idef0-box-modal').style.display = 'none';
+    document.getElementById('m-idef0-box-ok').removeEventListener('click', onOk);
+    document.getElementById('m-idef0-box-cancel').removeEventListener('click', onCancel);
+  }
+  function onOk() {
+    box.label = document.getElementById('m-idef0-box-label').value.trim() || box.label;
+    box.desc  = document.getElementById('m-idef0-box-desc').value.trim();
+    cleanup();
+    renderIDEF0();
+  }
+  function onCancel() { cleanup(); }
+  document.getElementById('m-idef0-box-ok').addEventListener('click', onOk, { once: true });
+  document.getElementById('m-idef0-box-cancel').addEventListener('click', onCancel, { once: true });
+}
+
+// ═══════════════════════════════════════════════════════════
+// IDEF0 — DELETE
+// ═══════════════════════════════════════════════════════════
+function idef0DeleteBox(id) {
+  IDEF0.boxes = IDEF0.boxes.filter(b => b.id !== id);
+  // Remove arrows connected to this box
+  IDEF0.arrows = IDEF0.arrows.filter(a => {
+    return !(a.src && a.src.startsWith('BOX:' + id)) &&
+           !(a.tgt && a.tgt.startsWith('BOX:' + id));
+  });
+  if (IDEF0.selected?.id === id) IDEF0.selected = null;
+  renderIDEF0();
+}
+
+function idef0DeleteArrow(id) {
+  IDEF0.arrows = IDEF0.arrows.filter(a => a.id !== id);
+  if (IDEF0.selected?.id === id) IDEF0.selected = null;
+  renderIDEF0();
+}
+
+// ═══════════════════════════════════════════════════════════
+// IDEF0 — CANVAS CLICK (add box, deselect)
+// ═══════════════════════════════════════════════════════════
+document.getElementById('idef0-svg').addEventListener('click', ev => {
+  if (S.mode !== 'idef0') return;
+  const wrap  = document.getElementById('idef0-wrap');
+  const rect  = wrap.getBoundingClientRect();
+  const rawX  = ev.clientX - rect.left + wrap.scrollLeft;
+  const rawY  = ev.clientY - rect.top  + wrap.scrollTop;
+  const x = snapGrid(rawX);
+  const y = snapGrid(rawY);
+
+  if (IDEF0.tool === 'box') {
+    const id = 'B' + (++IDEF0.nc);
+    const box = { id, label: id, desc: '', x, y, w: IDEF0_BOX_W, h: IDEF0_BOX_H, cpnData: null };
+    IDEF0.boxes.push(box);
+    IDEF0.selected = { type: 'box', id };
+    // Prompt for label immediately
+    openIDEF0BoxModal(box);
+    renderIDEF0();
+    return;
+  }
+
+  if (IDEF0.tool === 'arrow') {
+    // Clicked on empty canvas — create EDGE ref
+    if (IDEF0.arrowSrc) {
+      const edgeRef = `EDGE:${x}:${y}`;
+      const srcRef  = IDEF0.arrowSrc.ref;
+      IDEF0.arrowSrc = null;
+      document.getElementById('idef0-preview-layer').innerHTML = '';
+      openIDEF0ArrowModal(srcRef, edgeRef);
+    } else {
+      // Start from edge point
+      IDEF0.arrowSrc = { ref: `EDGE:${x}:${y}`, x, y };
+    }
+    return;
+  }
+
+  // Select tool — deselect
+  IDEF0.selected = null;
+  renderIDEF0();
+});
+
+// Arrow preview on mousemove
+document.getElementById('idef0-svg').addEventListener('mousemove', ev => {
+  if (S.mode !== 'idef0' || !IDEF0.arrowSrc) {
+    document.getElementById('idef0-preview-layer').innerHTML = '';
+    return;
+  }
+  const wrap = document.getElementById('idef0-wrap');
+  const rect = wrap.getBoundingClientRect();
+  const tx   = ev.clientX - rect.left + wrap.scrollLeft;
+  const ty   = ev.clientY - rect.top  + wrap.scrollTop;
+  const srcPt = { x: IDEF0.arrowSrc.x, y: IDEF0.arrowSrc.y };
+  const d = `M ${srcPt.x.toFixed(1)},${srcPt.y.toFixed(1)} L ${tx.toFixed(1)},${ty.toFixed(1)}`;
+  const prev = document.getElementById('idef0-preview-layer');
+  prev.innerHTML = '';
+  const previewPath = document.createElementNS(SVG_NS, 'path');
+  previewPath.setAttribute('d', d);
+  previewPath.setAttribute('class', 'arc-preview');
+  prev.appendChild(previewPath);
+});
+
+// ═══════════════════════════════════════════════════════════
+// IDEF0 — TOOL PALETTE
+// ═══════════════════════════════════════════════════════════
+document.getElementById('idef0-tool-palette').querySelectorAll('.tool-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    IDEF0.tool = b.dataset.idef0Tool;
+    IDEF0.arrowSrc = null;
+    document.getElementById('idef0-preview-layer').innerHTML = '';
+    document.getElementById('idef0-tool-palette').querySelectorAll('.tool-btn').forEach(x => x.classList.toggle('active', x === b));
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+// IDEF0 — NAVIGATION (drill down / navigate up)
+// ═══════════════════════════════════════════════════════════
+function captureModelData() {
+  return {
+    _initialized: true,
+    places:      JSON.parse(JSON.stringify(S.places)),
+    transitions: JSON.parse(JSON.stringify(S.transitions)),
+    arcs:        JSON.parse(JSON.stringify(S.arcs)),
+    colorsets:   JSON.parse(JSON.stringify(S.colorsets)),
+    vars:        JSON.parse(JSON.stringify(S.vars || {})),
+    nc: S.nc, ac: S.ac,
+    tx: S.tx, ty: S.ty, scale: S.scale,
+  };
+}
+
+function applyModelData(data) {
+  S.places      = JSON.parse(JSON.stringify(data.places      || []));
+  S.transitions = JSON.parse(JSON.stringify(data.transitions || []));
+  S.arcs        = JSON.parse(JSON.stringify(data.arcs        || []));
+  S.colorsets   = JSON.parse(JSON.stringify(data.colorsets   || {}));
+  S.vars        = JSON.parse(JSON.stringify(data.vars        || {}));
+  S.nc     = data.nc    || S.nc;
+  S.ac     = data.ac    || S.ac;
+  S.tx     = data.tx    || 0;
+  S.ty     = data.ty    || 0;
+  S.scale  = data.scale || 1;
+  S.selected = null;
+  S.history = []; S.histIdx = -1;
+}
+
+function clearModel() {
+  S.places = []; S.transitions = []; S.arcs = [];
+  S.colorsets = {}; S.vars = {};
+  S.selected = null;
+  S.history = []; S.histIdx = -1;
+  S.tx = 0; S.ty = 0; S.scale = 1;
+}
+
+function createPortPlaces(boxId) {
+  const connected = IDEF0.arrows.filter(a => {
+    return (a.src && a.src.startsWith('BOX:' + boxId)) ||
+           (a.tgt && a.tgt.startsWith('BOX:' + boxId));
+  });
+  const spacing = 120;
+  const roleCounts = { i: 0, c: 0, o: 0, m: 0 };
+  connected.forEach(arrow => {
+    const role = arrow.role || 'i';
+    const idx  = roleCounts[role]++;
+    let px, py;
+    if (role === 'i')      { px = 100;              py = 150 + idx * spacing; }
+    else if (role === 'c') { px = 200 + idx * spacing; py = 80; }
+    else if (role === 'o') { px = 700;              py = 150 + idx * spacing; }
+    else                   { px = 200 + idx * spacing; py = 480; }
+
+    const placeId = 'P' + (++S.nc);
+    S.places.push({
+      id: placeId,
+      label: arrow.label || ('Port_' + (idx + 1)),
+      colorSet: arrow.colorSet || 'TOKEN',
+      initTokens: [], tokens: [],
+      x: snapGrid(px), y: snapGrid(py),
+      isPort: true, portRole: role, portArrowId: arrow.id,
+    });
+  });
+}
+
+function idef0DrillDown(boxId) {
+  const box = idef0FindBox(boxId);
+  if (!box) return;
+
+  // Save current CPN if we were already inside another box
+  if (IDEF0.activeBox) {
+    const prevBox = idef0FindBox(IDEF0.activeBox);
+    if (prevBox) prevBox.cpnData = captureModelData();
+  }
+
+  // Load this box's CPN
+  if (box.cpnData && box.cpnData._initialized) {
+    applyModelData(box.cpnData);
+  } else {
+    clearModel();
+    createPortPlaces(boxId);
+    // Mark as initialized so subsequent drill-downs restore the saved model
+    box.cpnData = { _initialized: true };
+  }
+
+  IDEF0.activeBox = boxId;
+
+  // Show breadcrumb
+  document.getElementById('breadcrumb').classList.add('visible');
+  document.getElementById('bc-box').textContent = box.label;
+
+  // Switch to visual mode — skip applyText() so our loaded model isn't overwritten
+  switchMode._skipApplyText = true;
+  switchMode('visual');
+}
+
+function idef0NavigateUp() {
+  if (!IDEF0.activeBox) return;
+  const box = idef0FindBox(IDEF0.activeBox);
+  if (box) box.cpnData = captureModelData();
+  IDEF0.activeBox = null;
+  document.getElementById('breadcrumb').classList.remove('visible');
+  switchMode('idef0');
+}
+
+// Breadcrumb click
+document.getElementById('bc-idef0').addEventListener('click', idef0NavigateUp);
+
+// ═══════════════════════════════════════════════════════════
+// IDEF0 — STATUS BAR
+// ═══════════════════════════════════════════════════════════
+function updateIDEF0StatusBar() {
+  document.getElementById('sb-p').textContent   = IDEF0.boxes.length;
+  document.getElementById('sb-t').textContent   = IDEF0.arrows.length;
+  document.getElementById('sb-a').textContent   = '-';
+  document.getElementById('sb-tok').textContent = '-';
+}
+
+// ═══════════════════════════════════════════════════════════
+// IDEF0 — EXAMPLE
+// ═══════════════════════════════════════════════════════════
+function loadIDEF0Example() {
+  IDEF0.boxes = [
+    { id: 'B1', label: 'Receive Order',   desc: 'Validate & register', x:  80, y: 160, w: 180, h: 100, cpnData: null },
+    { id: 'B2', label: 'Process Payment', desc: 'Charge & confirm',    x: 340, y: 160, w: 180, h: 100, cpnData: null },
+    { id: 'B3', label: 'Fulfill Order',   desc: 'Pick, pack & ship',   x: 600, y: 160, w: 180, h: 100, cpnData: null },
+  ];
+  IDEF0.arrows = [
+    { id: 'A1',  src: 'EDGE:30:210',     tgt: 'BOX:B1:left',   role: 'i', label: 'Customer Order',  colorSet: 'ORDER'  },
+    { id: 'A2',  src: 'BOX:B1:right',    tgt: 'BOX:B2:left',   role: 'i', label: 'Validated Order', colorSet: 'ORDER'  },
+    { id: 'A3',  src: 'BOX:B2:right',    tgt: 'BOX:B3:left',   role: 'i', label: 'Paid Order',      colorSet: 'ORDER'  },
+    { id: 'A4',  src: 'BOX:B3:right',    tgt: 'EDGE:830:210',  role: 'o', label: 'Shipped Order',   colorSet: 'ORDER'  },
+    { id: 'A5',  src: 'EDGE:170:60',     tgt: 'BOX:B1:top',    role: 'c', label: 'Business Rules',  colorSet: 'RULE'   },
+    { id: 'A6',  src: 'EDGE:430:60',     tgt: 'BOX:B2:top',    role: 'c', label: 'Payment Policy',  colorSet: 'RULE'   },
+    { id: 'A7',  src: 'EDGE:690:60',     tgt: 'BOX:B3:top',    role: 'c', label: 'Shipping Policy', colorSet: 'RULE'   },
+    { id: 'A8',  src: 'EDGE:170:310',    tgt: 'BOX:B1:bottom', role: 'm', label: 'Staff',           colorSet: 'PERSON' },
+    { id: 'A9',  src: 'EDGE:430:310',    tgt: 'BOX:B2:bottom', role: 'm', label: 'Payment System',  colorSet: 'SYSTEM' },
+    { id: 'A10', src: 'EDGE:690:310',    tgt: 'BOX:B3:bottom', role: 'm', label: 'Warehouse',       colorSet: 'PLACE'  },
+  ];
+  IDEF0.nc = 3; IDEF0.ac = 10;
+  renderIDEF0();
+  log('IDEF0 example loaded', 'system');
+}
 
 // ═══════════════════════════════════════════════════════════
 // RIGHT PANEL TABS
@@ -2013,9 +2861,9 @@ document.querySelectorAll('.right-tab').forEach(b=>b.addEventListener('click',()
 // ═══════════════════════════════════════════════════════════
 // TOOL PALETTE
 // ═══════════════════════════════════════════════════════════
-document.querySelectorAll('.tool-btn').forEach(b=>b.addEventListener('click',()=>{
+document.querySelectorAll('#tool-palette .tool-btn').forEach(b=>b.addEventListener('click',()=>{
   S.tool=b.dataset.tool;clearArcDraw();
-  document.querySelectorAll('.tool-btn').forEach(x=>x.classList.toggle('active',x===b));
+  document.querySelectorAll('#tool-palette .tool-btn').forEach(x=>x.classList.toggle('active',x===b));
   const svg=document.getElementById('cpn-svg');
   svg.className=`tool-${S.tool}`;
 }));
@@ -2108,8 +2956,32 @@ document.getElementById('reach-btn').addEventListener('click',()=>{
 // KEYBOARD SHORTCUTS
 // ═══════════════════════════════════════════════════════════
 document.addEventListener('keydown',ev=>{
-  if(['INPUT','TEXTAREA'].includes(ev.target.tagName))return;
+  if(['INPUT','TEXTAREA','SELECT'].includes(ev.target.tagName))return;
   const k=ev.key;
+
+  // IDEF0 mode shortcuts
+  if (S.mode === 'idef0') {
+    if (k === 's' || k === 'S') document.querySelector('[data-idef0-tool="select"]')?.click();
+    if (k === 'b' || k === 'B') document.querySelector('[data-idef0-tool="box"]')?.click();
+    if (k === 'a' || k === 'A') document.querySelector('[data-idef0-tool="arrow"]')?.click();
+    if (k === 'd' || k === 'D') document.querySelector('[data-idef0-tool="delete"]')?.click();
+    if (k === 'Escape') {
+      IDEF0.arrowSrc = null;
+      IDEF0.selected = null;
+      document.getElementById('idef0-preview-layer').innerHTML = '';
+      renderIDEF0();
+    }
+    if (k === 'Delete' || k === 'Backspace') {
+      if (IDEF0.selected) {
+        if (IDEF0.selected.type === 'box')   idef0DeleteBox(IDEF0.selected.id);
+        if (IDEF0.selected.type === 'arrow') idef0DeleteArrow(IDEF0.selected.id);
+      }
+    }
+    if (k === 'z' && (ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); /* IDEF0 undo: no-op for now */ }
+    return;
+  }
+
+  // CPN mode shortcuts
   if(k==='s'||k==='S')document.querySelector('[data-tool="select"]').click();
   if(k==='p'||k==='P')document.querySelector('[data-tool="place"]').click();
   if(k==='t'||k==='T')document.querySelector('[data-tool="transition"]').click();
