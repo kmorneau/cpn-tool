@@ -676,7 +676,13 @@ input, textarea, select { font-family: var(--mono); color: var(--text); backgrou
             <div class="prop-row">
               <div class="prop-lbl">CPN Sub-model</div>
               <div style="font-size:13px;color:var(--text3);padding:2px 0" id="ip-cpn-status"></div>
-              <button class="prop-inp" id="ip-drill" style="margin-top:4px;cursor:pointer;background:var(--bg3);color:var(--enabled);border-color:var(--place)">▶ Open CPN</button>
+              <select class="prop-inp" id="ip-cpn-link" style="margin-top:4px">
+                <option value="">— build from scratch —</option>
+              </select>
+              <div style="display:flex;gap:4px;margin-top:4px">
+                <button class="prop-inp" id="ip-drill" style="flex:1;cursor:pointer;background:var(--bg3);color:var(--enabled);border-color:var(--place)">▶ Open</button>
+                <button class="prop-inp" id="ip-unlink" style="flex:1;cursor:pointer;background:var(--bg3);color:var(--red);border-color:#7f1d1d" title="Clear CPN sub-model">✕ Clear</button>
+              </div>
             </div>
           </div>
           <div id="idef0-arrow-props" style="display:none">
@@ -2091,8 +2097,18 @@ function updateIDEF0PropsPanel() {
     document.getElementById('ip-w').value     = box.w;
     document.getElementById('ip-h').value     = box.h;
     const hasCPN = !!(box.cpnData && box.cpnData._initialized);
-    document.getElementById('ip-cpn-status').textContent = hasCPN ? '✓ CPN model saved' : '(none yet)';
-    document.getElementById('ip-cpn-status').style.color = hasCPN ? 'var(--trans-hi)' : 'var(--text3)';
+    const linkedId = box.linkedModelId || null;
+    // Status line
+    if (linkedId) {
+      const opt = document.querySelector(`#ip-cpn-link option[value="${linkedId}"]`);
+      document.getElementById('ip-cpn-status').textContent = opt ? `⇢ ${opt.textContent}` : '⇢ saved model';
+      document.getElementById('ip-cpn-status').style.color = 'var(--enabled)';
+    } else {
+      document.getElementById('ip-cpn-status').textContent = hasCPN ? '✓ CPN sub-model built' : '(none yet)';
+      document.getElementById('ip-cpn-status').style.color = hasCPN ? 'var(--trans-hi)' : 'var(--text3)';
+    }
+    // Populate model picker and set current selection
+    populateIDEF0ModelPicker(linkedId);
   } else if (sel.type === 'arrow') {
     const arrow = idef0FindArrow(sel.id);
     if (!arrow) return;
@@ -2134,6 +2150,63 @@ document.getElementById('ip-h').addEventListener('change', ev => {
 document.getElementById('ip-drill').addEventListener('click', () => {
   const sel = IDEF0.selected; if (!sel || sel.type !== 'box') return;
   idef0DrillDown(sel.id);
+});
+
+document.getElementById('ip-unlink').addEventListener('click', () => {
+  const sel = IDEF0.selected; if (!sel || sel.type !== 'box') return;
+  const box = idef0FindBox(sel.id); if (!box) return;
+  if (!confirm(`Clear the CPN sub-model for "${box.label}"? This cannot be undone.`)) return;
+  box.cpnData = null;
+  box.linkedModelId = null;
+  scheduleIDEF0Autosave();
+  updateIDEF0PropsPanel();
+  renderIDEF0();
+});
+
+// Populate the CPN model picker with all saved models
+async function populateIDEF0ModelPicker(selectedId) {
+  const sel = document.getElementById('ip-cpn-link');
+  // Preserve options if already populated (avoid flicker on repeated selections)
+  const res = await fetch('/api/models');
+  if (!res.ok) return;
+  const models = await res.json();
+  sel.replaceChildren();
+  const blank = document.createElement('option');
+  blank.value = ''; blank.textContent = '— build from scratch —';
+  sel.appendChild(blank);
+  models.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.id; opt.textContent = m.name;
+    if (m.id === selectedId) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+document.getElementById('ip-cpn-link').addEventListener('change', async ev => {
+  const sel = IDEF0.selected; if (!sel || sel.type !== 'box') return;
+  const box = idef0FindBox(sel.id); if (!box) return;
+  const modelId = parseInt(ev.target.value) || null;
+
+  if (!modelId) {
+    // Detach — revert to scratch
+    box.linkedModelId = null;
+    scheduleIDEF0Autosave();
+    updateIDEF0PropsPanel();
+    return;
+  }
+
+  // Load the chosen saved model and store it as the box's CPN data
+  const res = await fetch(`/api/models/${modelId}`);
+  if (!res.ok) { log('Failed to load model', 'error'); return; }
+  const model = await res.json();
+
+  // Store the raw text; idef0DrillDown will call applyText when opening
+  box.cpnData = { _initialized: true, _rawText: model.content };
+  box.linkedModelId = modelId;
+  scheduleIDEF0Autosave();
+  updateIDEF0PropsPanel();
+  renderIDEF0();
+  log(`Box "${esc(box.label)}" linked to model "${esc(model.name)}"`, 'system');
 });
 
 // Arrow property changes
@@ -3108,12 +3181,20 @@ function idef0DrillDown(boxId) {
   }
 
   // Load this box's CPN
-  if (box.cpnData && box.cpnData._initialized) {
+  if (box.cpnData && box.cpnData._rawText) {
+    // Linked from a saved model — parse the raw CPN text
+    clearModel();
+    ed.value = box.cpnData._rawText;
+    updateHL();
+    applyText();
+    autoLayout(); render(); fitToScreen();
+    // Upgrade to full snapshot so edits persist independently
+    box.cpnData = { ...captureModelData(), _initialized: true };
+  } else if (box.cpnData && box.cpnData._initialized) {
     applyModelData(box.cpnData);
   } else {
     clearModel();
     createPortPlaces(boxId);
-    // Mark as initialized so subsequent drill-downs restore the saved model
     box.cpnData = { _initialized: true };
   }
 
