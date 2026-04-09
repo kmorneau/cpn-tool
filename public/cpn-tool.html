@@ -543,9 +543,9 @@ input, textarea, select { font-family: var(--mono); color: var(--text); backgrou
   <div id="logo"><span class="logo-cpn">cpn</span><span class="logo-tool">TOOL</span></div>
 
   <div id="mode-tabs">
-    <button class="mode-tab active" data-mode="visual">◈ Visual</button>
-    <button class="mode-tab" data-mode="text">⌨ Text</button>
-    <button class="mode-tab" data-mode="idef0">⬡ IDEF0</button>
+    <button class="mode-tab active" data-mode="idef0">⬡ System</button>
+    <button class="mode-tab" data-mode="visual">◈ CPN</button>
+    <button class="mode-tab" data-mode="text">⌨ Code</button>
   </div>
 
   <div id="sim-controls">
@@ -558,31 +558,26 @@ input, textarea, select { font-family: var(--mono); color: var(--text); backgrou
   </div>
 
   <div id="topbar-right">
-    <button class="export-btn" id="btn-svg">SVG</button>
-    <button class="export-btn" id="btn-png">PNG</button>
-    <button class="export-btn" id="btn-pnml">PNML</button>
-    <button class="export-btn" id="btn-cpn">.cpn</button>
+    <span id="cpn-export-btns">
+      <button class="export-btn" id="btn-svg">SVG</button>
+      <button class="export-btn" id="btn-png">PNG</button>
+      <button class="export-btn" id="btn-pnml">PNML</button>
+      <button class="export-btn" id="btn-cpn">.cpn</button>
+    </span>
+    <span id="sys-export-btns" style="display:none">
+      <button class="export-btn" id="btn-sys-svg">SVG</button>
+      <button class="export-btn" id="btn-sys-png">PNG</button>
+      <button class="export-btn" id="btn-sys">.sys</button>
+    </span>
     <div class="sep"></div>
     <button class="export-btn" id="btn-import">Import</button>
     <button class="export-btn" id="btn-help" title="?">?</button>
-    <input type="file" id="file-inp" accept=".cpn,.txt,.pnml" style="display:none">
+    <input type="file" id="file-inp" accept=".cpn,.txt,.pnml,.sys" style="display:none">
     <div class="sep"></div>
-    <!-- CPN model selector (hidden in IDEF0 mode) -->
-    <span id="cpn-save-bar">
-      <select id="model-select" class="export-btn" style="width:130px;cursor:pointer;background:var(--bg3)">
-        <option value="">— models —</option>
-      </select>
-      <button class="export-btn" id="btn-save-model" title="Save current CPN model">Save</button>
-      <button class="export-btn" id="btn-save-as-model" title="Save as new CPN model">Save As</button>
-    </span>
-    <!-- IDEF0 diagram selector (visible only in IDEF0 mode) -->
-    <span id="idef0-save-bar" style="display:none">
-      <select id="idef0-select" class="export-btn" style="width:130px;cursor:pointer;background:var(--bg3)">
-        <option value="">— diagrams —</option>
-      </select>
-      <button class="export-btn" id="btn-save-idef0" title="Save current IDEF0 diagram">Save</button>
-      <button class="export-btn" id="btn-save-as-idef0" title="Save as new IDEF0 diagram">Save As</button>
-    </span>
+    <!-- Unified name + save — content depends on active tab -->
+    <span id="current-name" style="font-size:12px;color:var(--text2);font-family:var(--mono)">— unsaved —</span>
+    <button class="export-btn" id="btn-save">Save</button>
+    <button class="export-btn" id="btn-save-as">Save As</button>
     <div class="sep"></div>
     <span id="user-info" style="font-size:15px;color:var(--text2);padding:0 4px"></span>
     <a id="admin-link" href="/admin" style="display:none" class="export-btn">Admin</a>
@@ -610,6 +605,8 @@ input, textarea, select { font-family: var(--mono); color: var(--text); backgrou
       <button class="tool-btn" data-idef0-tool="box"><span class="tool-icon">⬡</span>Add Box<span class="tool-key">B</span></button>
       <button class="tool-btn" data-idef0-tool="arrow"><span class="tool-icon">→</span>Draw Arrow<span class="tool-key">A</span></button>
       <button class="tool-btn" data-idef0-tool="delete"><span class="tool-icon">✕</span>Delete<span class="tool-key">D</span></button>
+      <div style="border-top:1px solid var(--border);margin:6px 0"></div>
+      <button class="tool-btn" id="btn-cpn-to-idef0" title="Generate system diagram from current CPN model"><span class="tool-icon">⟳</span>Sync from CPN</button>
     </div>
 
     <div class="panel-hdr" style="margin-top:2px">Examples</div>
@@ -676,9 +673,9 @@ input, textarea, select { font-family: var(--mono); color: var(--text); backgrou
             <div class="prop-row">
               <div class="prop-lbl">CPN Sub-model</div>
               <div style="font-size:13px;color:var(--text3);padding:2px 0" id="ip-cpn-status"></div>
-              <select class="prop-inp" id="ip-cpn-link" style="margin-top:4px">
-                <option value="">— build from scratch —</option>
-              </select>
+              <input class="prop-inp" id="ip-cpn-link" list="ip-cpn-list"
+                placeholder="Type model name…" autocomplete="off" style="margin-top:4px">
+              <datalist id="ip-cpn-list"></datalist>
               <div style="display:flex;gap:4px;margin-top:4px">
                 <button class="prop-inp" id="ip-drill" style="flex:1;cursor:pointer;background:var(--bg3);color:var(--enabled);border-color:var(--place)">▶ Open</button>
                 <button class="prop-inp" id="ip-unlink" style="flex:1;cursor:pointer;background:var(--bg3);color:var(--red);border-color:#7f1d1d" title="Clear CPN sub-model">✕ Clear</button>
@@ -708,7 +705,7 @@ input, textarea, select { font-family: var(--mono); color: var(--text); backgrou
       </div>
     </div>
 
-    <div class="panel-hdr">Marking</div>
+    <div class="panel-hdr" id="marking-hdr">Marking</div>
     <div id="marking-panel"></div>
   </div>
 
@@ -1016,7 +1013,7 @@ const S = {
   places: [], transitions: [], arcs: [], colorsets: {},
   selected: null,
   tool: 'select',
-  mode: 'visual',
+  mode: 'idef0',
   snap: true,
   // Canvas transform
   tx: 0, ty: 0, scale: 1,
@@ -1038,6 +1035,8 @@ const S = {
 
 // ═══════════════════════════════════════════════════════════
 // IDEF0 STATE
+let _idef0ModelList = []; // cached model list for datalist autocomplete
+
 // ═══════════════════════════════════════════════════════════
 const IDEF0 = {
   boxes: [],       // { id, label, desc, x, y, w, h, cpnData }
@@ -1058,16 +1057,16 @@ const IDEF0_BOX_W = 200, IDEF0_BOX_H = 120;
 // ═══════════════════════════════════════════════════════════
 const EXAMPLES = {
 producer:`// Producer-Consumer CPN
-colorset JOBS = {job1, job2, job3}
+colorset JOBS    = {job1, job2, job3}
 colorset WORKERS = {w1, w2}
 
-place Ready    : JOBS    = {job1, job2, job3}
-place Idle     : WORKERS = {w1, w2}
-place Busy     : JOBS*WORKERS = {}
-place Done     : JOBS    = {}
+place Ready : JOBS         = {job1, job2, job3}
+place Idle  : WORKERS      = {w1, w2}
+place Busy  : JOBS*WORKERS = {}
+place Done  : JOBS         = {}
 
 transition Assign   [guard: j in JOBS, w in WORKERS]
-transition Complete [guard: true]
+transition Complete
 
 arc Ready    --> Assign   : j
 arc Idle     --> Assign   : w
@@ -1081,28 +1080,28 @@ colorset PHIL = {p1, p2}
 colorset FORK = {f1, f2}
 
 place Thinking : PHIL      = {p1, p2}
-place Eating   : PHIL*FORK = {}
 place Forks    : FORK      = {f1, f2}
+place Eating   : PHIL*FORK = {}
 
 transition PickUp  [guard: p in PHIL, f in FORK]
-transition PutDown [guard: true]
+transition PutDown [guard: p in PHIL, f in FORK]
 
 arc Thinking --> PickUp  : p
 arc Forks    --> PickUp  : f
 arc PickUp   --> Eating  : (p,f)
 arc Eating   --> PutDown : (p,f)
-arc PutDown  --> Thinking: p
-arc PutDown  --> Forks   : f`,
+arc PutDown  --> Thinking : p
+arc PutDown  --> Forks    : f`,
 
 pipeline:`// Token Pipeline
 colorset DATA = {a, b, c}
 
-place Input   : DATA = {a, b, c}
-place Buffer  : DATA = {}
-place Output  : DATA = {}
+place Input  : DATA = {a, b, c}
+place Buffer : DATA = {}
+place Output : DATA = {}
 
-transition Push [guard: true]
-transition Pop  [guard: true]
+transition Push [guard: x in DATA]
+transition Pop  [guard: x in DATA]
 
 arc Input  --> Push   : x
 arc Push   --> Buffer : x
@@ -1119,7 +1118,7 @@ place Done      : PROC = {}
 place Semaphore : SEM  = {s}
 
 transition Enter [guard: p in PROC]
-transition Exit  [guard: true]
+transition Exit  [guard: p in PROC]
 
 arc Ready     --> Enter     : p
 arc Semaphore --> Enter     : s
@@ -2100,8 +2099,8 @@ function updateIDEF0PropsPanel() {
     const linkedId = box.linkedModelId || null;
     // Status line
     if (linkedId) {
-      const opt = document.querySelector(`#ip-cpn-link option[value="${linkedId}"]`);
-      document.getElementById('ip-cpn-status').textContent = opt ? `⇢ ${opt.textContent}` : '⇢ saved model';
+      const linked = _idef0ModelList.find(m => m.id === linkedId);
+      document.getElementById('ip-cpn-status').textContent = linked ? `⇢ ${linked.name}` : '⇢ saved model';
       document.getElementById('ip-cpn-status').style.color = 'var(--enabled)';
     } else {
       document.getElementById('ip-cpn-status').textContent = hasCPN ? '✓ CPN sub-model built' : '(none yet)';
@@ -2163,46 +2162,46 @@ document.getElementById('ip-unlink').addEventListener('click', () => {
   renderIDEF0();
 });
 
-// Populate the CPN model picker with all saved models
+// Populate the CPN model datalist with all saved models
 async function populateIDEF0ModelPicker(selectedId) {
-  const sel = document.getElementById('ip-cpn-link');
-  // Preserve options if already populated (avoid flicker on repeated selections)
+  const input = document.getElementById('ip-cpn-link');
+  const dl = document.getElementById('ip-cpn-list');
   const res = await fetch('/api/models');
   if (!res.ok) return;
-  const models = await res.json();
-  sel.replaceChildren();
-  const blank = document.createElement('option');
-  blank.value = ''; blank.textContent = '— build from scratch —';
-  sel.appendChild(blank);
-  models.forEach(m => {
+  _idef0ModelList = await res.json();
+  dl.replaceChildren();
+  _idef0ModelList.forEach(m => {
     const opt = document.createElement('option');
-    opt.value = m.id; opt.textContent = m.name;
-    if (m.id === selectedId) opt.selected = true;
-    sel.appendChild(opt);
+    opt.value = m.name;
+    dl.appendChild(opt);
   });
+  const linked = _idef0ModelList.find(m => m.id === selectedId);
+  input.value = linked ? linked.name : '';
 }
 
 document.getElementById('ip-cpn-link').addEventListener('change', async ev => {
   const sel = IDEF0.selected; if (!sel || sel.type !== 'box') return;
   const box = idef0FindBox(sel.id); if (!box) return;
-  const modelId = parseInt(ev.target.value) || null;
+  const typedName = ev.target.value.trim();
+  const match = _idef0ModelList.find(m => m.name === typedName);
 
-  if (!modelId) {
-    // Detach — revert to scratch
+  if (!match) {
+    // Detach — clear link if name doesn't match any saved model
     box.linkedModelId = null;
+    box.cpnData = null;
     scheduleIDEF0Autosave();
     updateIDEF0PropsPanel();
     return;
   }
 
   // Load the chosen saved model and store it as the box's CPN data
-  const res = await fetch(`/api/models/${modelId}`);
+  const res = await fetch(`/api/models/${match.id}`);
   if (!res.ok) { log('Failed to load model', 'error'); return; }
   const model = await res.json();
 
   // Store the raw text; idef0DrillDown will call applyText when opening
   box.cpnData = { _initialized: true, _rawText: model.content };
-  box.linkedModelId = modelId;
+  box.linkedModelId = match.id;
   scheduleIDEF0Autosave();
   updateIDEF0PropsPanel();
   renderIDEF0();
@@ -2274,7 +2273,50 @@ document.getElementById('overlay').addEventListener('click',ev=>{
 // ═══════════════════════════════════════════════════════════
 function updateMarkingPanel() {
   const el=document.getElementById('marking-panel');
+  const hdr=document.getElementById('marking-hdr');
   el.replaceChildren();
+
+  if (S.mode === 'idef0') {
+    hdr.textContent = 'Diagram';
+    // Show system diagram stats
+    const boxes = IDEF0.boxes || [];
+    const arrows = IDEF0.arrows || [];
+    if (!boxes.length && !arrows.length) {
+      const d=document.createElement('div');
+      d.style.cssText='font-size:15px;color:var(--text3);padding:6px 10px';
+      d.textContent='Empty diagram';
+      el.appendChild(d);
+      return;
+    }
+    // Box count
+    const bRow=document.createElement('div');bRow.className='mark-row';
+    const bName=document.createElement('span');bName.className='mark-name';bName.textContent='Boxes';
+    const bVal=document.createElement('span');bVal.className='mark-val';bVal.textContent=boxes.length;
+    bRow.appendChild(bName);bRow.appendChild(bVal);el.appendChild(bRow);
+    // Arrow counts by role
+    const roles={i:0,c:0,o:0,m:0};
+    arrows.forEach(a=>{ if(a.role in roles) roles[a.role]++; });
+    const roleNames={i:'Inputs',c:'Controls',o:'Outputs',m:'Mechanisms'};
+    const roleColors={i:'#3b82f6',c:'#f59e0b',o:'#22c55e',m:'#a855f7'};
+    Object.entries(roleNames).forEach(([k,label])=>{
+      const row=document.createElement('div');row.className='mark-row';
+      const name=document.createElement('span');name.className='mark-name';
+      name.style.color=roleColors[k];name.textContent=label;
+      const val=document.createElement('span');val.className='mark-val';val.textContent=roles[k];
+      row.appendChild(name);row.appendChild(val);el.appendChild(row);
+    });
+    // Linked CPN count
+    const linked=boxes.filter(b=>b.linkedModelId).length;
+    if (boxes.length) {
+      const lRow=document.createElement('div');lRow.className='mark-row';
+      const lName=document.createElement('span');lName.className='mark-name';lName.style.color='var(--text3)';lName.textContent='CPN linked';
+      const lVal=document.createElement('span');lVal.className='mark-val';lVal.textContent=`${linked}/${boxes.length}`;
+      lRow.appendChild(lName);lRow.appendChild(lVal);el.appendChild(lRow);
+    }
+    return;
+  }
+
+  hdr.textContent = 'Marking';
   if(!S.places.length){
     const d=document.createElement('div');
     d.style.cssText='font-size:15px;color:var(--text3);padding:6px 10px';
@@ -2385,6 +2427,7 @@ function applyText() {
 function switchMode(mode) {
   S.mode = mode;
   document.querySelectorAll('.mode-tab').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  syncCurrentName();
 
   const canvasWrap   = document.getElementById('canvas-wrap');
   const editorWrap   = document.getElementById('editor-wrap');
@@ -2393,6 +2436,9 @@ function switchMode(mode) {
   const cpnTools     = document.getElementById('tool-palette');
   const idef0Tools   = document.getElementById('idef0-tool-palette');
 
+  document.getElementById('cpn-export-btns').style.display = mode === 'idef0' ? 'none' : '';
+  document.getElementById('sys-export-btns').style.display = mode === 'idef0' ? '' : 'none';
+
   if (mode === 'idef0') {
     canvasWrap.style.display  = 'none';
     editorWrap.style.display  = 'none';
@@ -2400,8 +2446,6 @@ function switchMode(mode) {
     simControls.style.display = 'none';
     cpnTools.classList.add('mode-idef0');
     idef0Tools.classList.add('mode-idef0');
-    document.getElementById('cpn-save-bar').style.display  = 'none';
-    document.getElementById('idef0-save-bar').style.display = '';
     // Swap properties panel
     document.getElementById('no-sel').style.display    = 'none';
     document.getElementById('props-form').style.display = 'none';
@@ -2415,20 +2459,23 @@ function switchMode(mode) {
       renderIDEF0();
     }
     updateIDEF0StatusBar();
+    updateMarkingPanel();
   } else {
     idef0Wrap.classList.remove('mode-idef0');
     cpnTools.classList.remove('mode-idef0');
     idef0Tools.classList.remove('mode-idef0');
-    simControls.style.display = '';
-    document.getElementById('cpn-save-bar').style.display  = '';
-    document.getElementById('idef0-save-bar').style.display = 'none';
+    simControls.style.display = mode === 'visual' ? '' : 'none';
     // Restore CPN properties panel
     document.getElementById('idef0-props').style.display = 'none';
 
     if (mode === 'text') {
       canvasWrap.style.display = 'none';
       editorWrap.style.display = 'flex';
-      ed.value = serializeCPN();
+      if (_codeContext === 'idef0') {
+        ed.value = serializeIDEF0DSL();
+      } else {
+        ed.value = serializeCPN();
+      }
       updateHL();
     } else {
       // visual mode
@@ -2436,61 +2483,206 @@ function switchMode(mode) {
       editorWrap.style.display = 'none';
       // Only parse text editor if coming from text mode or no existing model data
       // (When coming from IDEF0 drill-down, S.places is already set — skip applyText)
-      if (!switchMode._skipApplyText) {
+      if (!switchMode._skipApplyText && _codeContext === 'cpn') {
         applyText();
       }
       switchMode._skipApplyText = false;
       render();
-      applyTransform();
+      if (S._needsFit) { S._needsFit = false; fitToScreen(); }
+      else { applyTransform(); }
     }
+    updateMarkingPanel();
   }
 }
 switchMode._skipApplyText = false;
+let _codeContext = 'cpn'; // 'cpn' or 'idef0' — which DSL the code editor holds
+
 document.querySelectorAll('.mode-tab').forEach(b => b.addEventListener('click', () => {
-  const mode = b.dataset.mode;
-  // When leaving idef0 via tab (not breadcrumb), clear activeBox
-  if (S.mode === 'idef0' && mode !== 'idef0') {
-    // Do nothing special — normal switch
+  const from = S.mode;
+  const to   = b.dataset.mode;
+  // Leaving code tab — flush edits back to the right model
+  if (from === 'text') {
+    if (_codeContext === 'idef0') {
+      deserializeIDEF0(ed.value);
+      renderIDEF0();
+      scheduleIDEF0Autosave();
+    }
+    // CPN flush is handled inside switchMode via applyText()
   }
-  switchMode(mode);
+  // Entering code tab — load the right DSL
+  if (to === 'text') {
+    _codeContext = (from === 'idef0' || (from === 'text' && _codeContext === 'idef0')) ? 'idef0' : 'cpn';
+  }
+  switchMode(to);
 }));
 
 // ═══════════════════════════════════════════════════════════
-// IDEF0 — SERIALIZE / DESERIALIZE
+// IDEF0 — DSL SERIALIZER / PARSER
 // ═══════════════════════════════════════════════════════════
 
+// Escape / unescape double-quote strings inside the DSL
+function _dslEsc(s)   { return String(s||'').replace(/\\/g,'\\\\').replace(/"/g,'\\"'); }
+function _dslUnesc(s) { return s.replace(/\\"/g,'"').replace(/\\\\/g,'\\'); }
+
+const IDEF0_ROLE_WORD = { i:'input', c:'control', o:'output', m:'mechanism' };
+const IDEF0_ROLE_CHAR = { input:'i', control:'c', output:'o', mechanism:'m' };
+
 /**
- * Serialize the IDEF0 diagram to a JSON string for /api/idef0 storage.
- * If currently drilled into a box, that box's live CPN is captured first.
- * Each box's cpnData stores the raw model snapshot (captureModelData()).
+ * Serialize the IDEF0 diagram to DSL text.
+ * Format:
+ *   box ID "Label" @ x,y WxH
+ *     desc "..."
+ *     cpn "model name"       ← linked saved CPN model
+ *     cpndata <base64>        ← embedded CPN snapshot (if modified in-place)
+ *
+ *   arrow ID input|control|output|mechanism "Label" COLORSET : SRC -> TGT
+ *     bend x,y               ← optional user-placed midpoint
  */
-function serializeIDEF0() {
+function serializeIDEF0DSL() {
   if (IDEF0.activeBox) {
     const box = idef0FindBox(IDEF0.activeBox);
     if (box) box.cpnData = captureModelData();
   }
-  return JSON.stringify({
-    boxes:  IDEF0.boxes,
-    arrows: IDEF0.arrows,
-    nc:     IDEF0.nc,
-    ac:     IDEF0.ac,
+  const lines = ['// System Diagram — CPN Tool DSL v1.0'];
+  IDEF0.boxes.forEach(b => {
+    lines.push('');
+    lines.push(`box ${b.id} "${_dslEsc(b.label)}" @ ${Math.round(b.x)},${Math.round(b.y)} ${Math.round(b.w)}x${Math.round(b.h)}`);
+    if (b.desc) lines.push(`  desc "${_dslEsc(b.desc)}"`);
+    if (b.linkedModelId) {
+      const m = _idef0ModelList.find(m => m.id === b.linkedModelId);
+      if (m) lines.push(`  cpn "${_dslEsc(m.name)}"`);
+    }
+    if (b.cpnData) {
+      try { lines.push(`  cpndata ${btoa(JSON.stringify(b.cpnData))}`); } catch(e) {}
+    }
+  });
+  IDEF0.arrows.forEach(a => {
+    lines.push('');
+    lines.push(`arrow ${a.id} ${IDEF0_ROLE_WORD[a.role]||a.role} "${_dslEsc(a.label||'')}" ${a.colorSet||'TOKEN'} : ${a.src} -> ${a.tgt}`);
+    if (a.bend) lines.push(`  bend ${Math.round(a.bend.x)},${Math.round(a.bend.y)}`);
+  });
+  return lines.join('\n');
+}
+
+/**
+ * Parse DSL text back into { boxes, arrows, nc, ac }.
+ * Tolerates legacy JSON format (detects by first non-whitespace char being '{').
+ */
+function parseIDEF0DSL(src) {
+  const boxes = [], arrows = [];
+  let current = null, nc = 0, ac = 0;
+  for (const rawLine of src.split('\n')) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('//') || line.startsWith('#')) continue;
+    let m;
+    // box ID "Label" @ x,y WxH   (coordinates optional)
+    if ((m = line.match(/^box\s+(\S+)\s+"((?:[^"\\]|\\.)*)"(?:\s+@\s+(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?))?/))) {
+      const hasCoords = m[3] !== undefined;
+      current = { _k:'box', id:m[1], label:_dslUnesc(m[2]),
+        x: hasCoords ? +m[3] : null, y: hasCoords ? +m[4] : null,
+        w: hasCoords ? +m[5] : IDEF0_BOX_W, h: hasCoords ? +m[6] : IDEF0_BOX_H,
+        desc:'', cpnData:null, linkedModelId:null, _autoPlace: !hasCoords };
+      boxes.push(current);
+      nc = Math.max(nc, parseInt(m[1].replace(/\D+/g,''))||0);
+      continue;
+    }
+    // arrow ID role "Label" COLORSET : SRC -> TGT
+    if ((m = line.match(/^arrow\s+(\S+)\s+(input|control|output|mechanism)\s+"((?:[^"\\]|\\.)*)"\s+(\S+)\s+:\s+(\S+)\s+->\s+(\S+)/))) {
+      current = { _k:'arrow', id:m[1], role:IDEF0_ROLE_CHAR[m[2]], label:_dslUnesc(m[3]), colorSet:m[4], src:m[5], tgt:m[6] };
+      arrows.push(current);
+      ac = Math.max(ac, parseInt(m[1].replace(/\D+/g,''))||0);
+      continue;
+    }
+    // sub-properties
+    if ((m = line.match(/^desc\s+"((?:[^"\\]|\\.)*)"/))   && current?._k==='box')   { current.desc = _dslUnesc(m[1]); continue; }
+    if ((m = line.match(/^cpn\s+"((?:[^"\\]|\\.)*)"/))    && current?._k==='box')   { current._cpnName = _dslUnesc(m[1]); continue; }
+    if ((m = line.match(/^cpndata\s+(\S+)/))               && current?._k==='box')   { try { current.cpnData = JSON.parse(atob(m[1])); } catch(e){} continue; }
+    if ((m = line.match(/^bend\s+(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/)) && current?._k==='arrow') { current.bend = { x:+m[1], y:+m[2] }; continue; }
+  }
+  boxes.forEach(b => { delete b._k; delete b._autoPlace; });
+  arrows.forEach(a => { delete a._k; });
+  return { boxes, arrows, nc, ac };
+}
+
+/**
+ * Auto-place any boxes whose coordinates were omitted from the DSL.
+ * Uses a simple left-to-right staircase layout, honouring boxes that
+ * already have fixed coordinates.
+ */
+function idef0AutoLayout() {
+  const toPlace = IDEF0.boxes.filter(b => b._autoPlace || b.x === null);
+  if (!toPlace.length) return;
+
+  // Find bounding region of already-placed boxes to avoid overlap
+  const placed = IDEF0.boxes.filter(b => !b._autoPlace && b.x !== null);
+  const PAD = 60;
+  const cols = Math.ceil(Math.sqrt(toPlace.length));
+  const colW = IDEF0_BOX_W + 160;
+  const rowH = IDEF0_BOX_H + 120;
+
+  // Start after any placed boxes, or at a sensible origin
+  let startX = PAD, startY = PAD;
+  if (placed.length) {
+    startX = Math.max(...placed.map(b => b.x + b.w)) + 160;
+  }
+
+  toPlace.forEach((b, i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    b.x = startX + col * colW;
+    b.y = startY + row * rowH;
+    delete b._autoPlace;
   });
 }
 
 /**
- * Restore IDEF0 state from a JSON string previously produced by serializeIDEF0().
+ * After loading, resolve any _cpnName strings to linkedModelId
+ * by matching against the cached _idef0ModelList.
  */
-function deserializeIDEF0(json) {
+function resolveIDEF0CpnLinks() {
+  IDEF0.boxes.forEach(b => {
+    if (b._cpnName) {
+      const m = _idef0ModelList.find(m => m.name === b._cpnName);
+      if (m) {
+        b.linkedModelId = m.id;
+        if (!b.cpnData) b.cpnData = null; // will be fetched on drill-down
+      }
+      delete b._cpnName;
+    }
+  });
+}
+
+/**
+ * Serialize IDEF0 to DSL string (used for both server save and .sys export).
+ */
+function serializeIDEF0() {
+  return serializeIDEF0DSL();
+}
+
+/**
+ * Restore IDEF0 state from a DSL string (or legacy JSON).
+ */
+function deserializeIDEF0(text) {
   try {
-    const d = JSON.parse(json);
-    IDEF0.boxes     = d.boxes   || [];
-    IDEF0.arrows    = d.arrows  || [];
-    IDEF0.nc        = d.nc      || IDEF0.boxes.length;
-    IDEF0.ac        = d.ac      || IDEF0.arrows.length;
+    const trimmed = (text || '').trim();
+    let d;
+    if (trimmed.startsWith('{')) {
+      // Legacy JSON format — upgrade gracefully
+      const j = JSON.parse(trimmed);
+      d = { boxes: j.boxes||[], arrows: j.arrows||[], nc: j.nc||0, ac: j.ac||0 };
+    } else {
+      d = parseIDEF0DSL(trimmed);
+    }
+    IDEF0.boxes     = d.boxes;
+    IDEF0.arrows    = d.arrows;
+    IDEF0.nc        = d.nc || IDEF0.boxes.length;
+    IDEF0.ac        = d.ac || IDEF0.arrows.length;
     IDEF0.activeBox = null;
     IDEF0._exampleLoaded = true;
+    idef0AutoLayout();
+    resolveIDEF0CpnLinks();
   } catch(e) {
-    log('Failed to load IDEF0 diagram', 'error');
+    log('Failed to load system diagram', 'error');
   }
 }
 
@@ -2500,16 +2692,56 @@ function deserializeIDEF0(json) {
 function idef0FindBox(id)   { return IDEF0.boxes.find(b => b.id === id); }
 function idef0FindArrow(id) { return IDEF0.arrows.find(a => a.id === id); }
 
-function idef0BoxPort(boxId, side) {
+// idx = 0-based index of this arrow among all arrows on this side
+// total = how many arrows share this side
+function idef0BoxPort(boxId, side, idx = 0, total = 1) {
   const b = idef0FindBox(boxId);
   if (!b) return { x: 0, y: 0 };
+  const MARGIN = 0.15;
+  // t = position along the side from 0..1
+  const t = total <= 1 ? 0.5 : MARGIN + (idx / (total - 1)) * (1 - 2 * MARGIN);
   switch (side) {
-    case 'left':   return { x: b.x,           y: b.y + b.h / 2 };
-    case 'right':  return { x: b.x + b.w,     y: b.y + b.h / 2 };
-    case 'top':    return { x: b.x + b.w / 2, y: b.y };
-    case 'bottom': return { x: b.x + b.w / 2, y: b.y + b.h };
+    case 'left':   return { x: b.x,           y: b.y + b.h * t };
+    case 'right':  return { x: b.x + b.w,     y: b.y + b.h * t };
+    case 'top':    return { x: b.x + b.w * t, y: b.y };
+    case 'bottom': return { x: b.x + b.w * t, y: b.y + b.h };
     default:       return { x: b.x + b.w / 2, y: b.y + b.h / 2 };
   }
+}
+
+// Build a map of arrowId → { src: {idx,total}, tgt: {idx,total} }
+// by grouping all BOX refs by (boxId, side).
+function idef0BuildPortMap() {
+  const groups = {}; // "boxId:side" → [{arrowId, which}]
+  IDEF0.arrows.forEach(a => {
+    ['src','tgt'].forEach(which => {
+      const p = idef0ParseRef(a[which]);
+      if (p?.kind === 'box') {
+        const k = `${p.boxId}:${p.side}`;
+        (groups[k] = groups[k] || []).push({ arrowId: a.id, which });
+      }
+    });
+  });
+  const map = {};
+  Object.values(groups).forEach(entries => {
+    const total = entries.length;
+    entries.forEach(({ arrowId, which }, idx) => {
+      (map[arrowId] = map[arrowId] || {})[which] = { idx, total };
+    });
+  });
+  return map;
+}
+
+// Like idef0RefPoint but uses the port map for distributed box ports
+function idef0RefPointMapped(ref, arrowId, which, portMap) {
+  const p = idef0ParseRef(ref);
+  if (!p) return { x: 0, y: 0 };
+  if (p.kind === 'edge') return { x: p.x, y: p.y };
+  if (p.kind === 'box') {
+    const slot = portMap?.[arrowId]?.[which];
+    return idef0BoxPort(p.boxId, p.side, slot?.idx ?? 0, slot?.total ?? 1);
+  }
+  return { x: 0, y: 0 };
 }
 
 function idef0ParseRef(ref) {
@@ -2601,6 +2833,7 @@ function renderIDEF0() {
   renderIDEF0Arrows();
   renderIDEF0Boxes();
   syncIDEF0WorldSize();
+  updateMarkingPanel();
 }
 
 function renderIDEF0Boxes() {
@@ -2714,13 +2947,15 @@ function renderIDEF0Arrows() {
   if (!layer) return;
   layer.innerHTML = '';
 
+  const portMap = idef0BuildPortMap();
+
   IDEF0.arrows.forEach(arrow => {
     const isSel = IDEF0.selected?.type === 'arrow' && IDEF0.selected?.id === arrow.id;
     const role = arrow.role || 'i';
     const markerId = 'idef0-arr-' + role;
 
-    const srcPt = idef0RefPoint(arrow.src);
-    const tgtPt = idef0RefPoint(arrow.tgt);
+    const srcPt = idef0RefPointMapped(arrow.src, arrow.id, 'src', portMap);
+    const tgtPt = idef0RefPointMapped(arrow.tgt, arrow.id, 'tgt', portMap);
     const d = idef0ElbowPath(srcPt, arrow.src, tgtPt, arrow.tgt, arrow.bend || null);
 
     const g = document.createElementNS(SVG_NS, 'g');
@@ -2825,8 +3060,10 @@ function syncIDEF0WorldSize() {
     maxX = Math.max(maxX, b.x + b.w + 120);
     maxY = Math.max(maxY, b.y + b.h + 120);
   });
+  const _pm = idef0BuildPortMap();
   IDEF0.arrows.forEach(a => {
-    const sp = idef0RefPoint(a.src), tp = idef0RefPoint(a.tgt);
+    const sp = idef0RefPointMapped(a.src, a.id, 'src', _pm);
+    const tp = idef0RefPointMapped(a.tgt, a.id, 'tgt', _pm);
     maxX = Math.max(maxX, sp.x + 40, tp.x + 40);
     maxY = Math.max(maxY, sp.y + 40, tp.y + 40);
   });
@@ -2840,14 +3077,32 @@ function syncIDEF0WorldSize() {
 let idef0Drag = null;
 
 function idef0StartDrag(ev, box) {
-  const wrap = document.getElementById('idef0-wrap');
-  const rect = wrap.getBoundingClientRect();
+  // Snapshot all EDGE endpoints on arrows connected to this box at drag start
+  const connectedEdges = [];
+  IDEF0.arrows.forEach(a => {
+    const srcP = idef0ParseRef(a.src);
+    const tgtP = idef0ParseRef(a.tgt);
+    const srcBox = srcP?.kind === 'box' && srcP.boxId === box.id;
+    const tgtBox = tgtP?.kind === 'box' && tgtP.boxId === box.id;
+    if (srcBox && tgtP?.kind === 'edge') {
+      connectedEdges.push({ arrow: a, which: 'tgt', ox: tgtP.x, oy: tgtP.y });
+    }
+    if (tgtBox && srcP?.kind === 'edge') {
+      connectedEdges.push({ arrow: a, which: 'src', ox: srcP.x, oy: srcP.y });
+    }
+    // Also move bend points
+    if ((srcBox || tgtBox) && a.bend) {
+      connectedEdges.push({ arrow: a, which: 'bend', ox: a.bend.x, oy: a.bend.y });
+    }
+  });
+
   idef0Drag = {
     box,
     startMouseX: ev.clientX,
     startMouseY: ev.clientY,
     startBoxX: box.x,
     startBoxY: box.y,
+    connectedEdges,
     moved: false,
   };
   function onMove(e) {
@@ -2856,10 +3111,21 @@ function idef0StartDrag(ev, box) {
     const dy = e.clientY - idef0Drag.startMouseY;
     idef0Drag.box.x = snapGrid(idef0Drag.startBoxX + dx);
     idef0Drag.box.y = snapGrid(idef0Drag.startBoxY + dy);
+    // Move connected EDGE endpoints and bends by the same delta
+    idef0Drag.connectedEdges.forEach(({ arrow, which, ox, oy }) => {
+      const nx = snapGrid(ox + dx), ny = snapGrid(oy + dy);
+      if (which === 'bend') {
+        arrow.bend = { x: nx, y: ny };
+      } else {
+        const parsed = idef0ParseRef(arrow[which]);
+        arrow[which] = `EDGE:${nx}:${ny}`;
+      }
+    });
     idef0Drag.moved = true;
     renderIDEF0();
   }
   function onUp() {
+    if (idef0Drag?.moved) scheduleIDEF0Autosave();
     idef0Drag = null;
     document.removeEventListener('mousemove', onMove);
     document.removeEventListener('mouseup', onUp);
@@ -3094,7 +3360,7 @@ document.getElementById('idef0-svg').addEventListener('mousemove', ev => {
 // ═══════════════════════════════════════════════════════════
 // IDEF0 — TOOL PALETTE
 // ═══════════════════════════════════════════════════════════
-document.getElementById('idef0-tool-palette').querySelectorAll('.tool-btn').forEach(b => {
+document.getElementById('idef0-tool-palette').querySelectorAll('.tool-btn[data-idef0-tool]').forEach(b => {
   b.addEventListener('click', () => {
     IDEF0.tool = b.dataset.idef0Tool;
     IDEF0.arrowSrc = null;
@@ -3102,6 +3368,126 @@ document.getElementById('idef0-tool-palette').querySelectorAll('.tool-btn').forE
     document.getElementById('idef0-tool-palette').querySelectorAll('.tool-btn').forEach(x => x.classList.toggle('active', x === b));
   });
 });
+
+// ═══════════════════════════════════════════════════════════
+// IDEF0 — SYNC FROM CPN
+// ═══════════════════════════════════════════════════════════
+function syncIDEF0FromCPN() {
+  if (!S.transitions.length && !S.places.length) {
+    log('No CPN model loaded — nothing to sync', 'warn'); return;
+  }
+  if (IDEF0.boxes.length) {
+    if (!confirm('This will replace the current system diagram with one generated from the CPN model. Continue?')) return;
+  }
+
+  const boxes  = [];
+  const arrows = [];
+  let nc = 0, ac = 0;
+
+  // One box per transition
+  S.transitions.forEach(t => {
+    nc++;
+    boxes.push({ id:`B${nc}`, _tid: t.id, label: t.label, desc: t.guard && t.guard !== 'true' ? t.guard : '', x: null, y: null, w: IDEF0_BOX_W, h: IDEF0_BOX_H, cpnData: null, linkedModelId: null, _autoPlace: true });
+  });
+
+  // Helper — find box for a transition id
+  const boxOf = tid => boxes.find(b => b._tid === tid);
+
+  // Classify each place relative to each transition it touches
+  S.transitions.forEach(t => {
+    const box = boxOf(t.id);
+    if (!box) return;
+
+    // Arcs into this transition (place → transition)
+    const inArcs  = S.arcs.filter(a => a.tgt === t.id);
+    // Arcs out of this transition (transition → place)
+    const outArcs = S.arcs.filter(a => a.src === t.id);
+
+    const inPlaceIds  = new Set(inArcs.map(a => a.src));
+    const outPlaceIds = new Set(outArcs.map(a => a.tgt));
+
+    // Returned resources: appear on both in and out → Control
+    const controlIds  = new Set([...inPlaceIds].filter(id => outPlaceIds.has(id)));
+    // Pure inputs only → Input
+    const inputIds    = new Set([...inPlaceIds].filter(id => !controlIds.has(id)));
+    // Pure outputs only → Output
+    const outputIds   = new Set([...outPlaceIds].filter(id => !controlIds.has(id)));
+
+    // For each producing transition of an input place: inter-box arrow
+    // For external (no producing transition): EDGE arrow
+    const addArrow = (placeId, role, tgtRef) => {
+      const place = S.places.find(p => p.id === placeId);
+      if (!place) return;
+      const cs = place.colorSet || 'TOKEN';
+      const label = place.label || place.id;
+
+      // Is there a producing transition (output arc → this place)?
+      const producerArc = S.arcs.find(a => a.tgt === placeId && S.transitions.find(t2 => t2.id === a.src));
+      const producerBox = producerArc ? boxOf(producerArc.src) : null;
+
+      ac++;
+      const id = `A${ac}`;
+      if (producerBox && producerBox !== box) {
+        // inter-box: producing box → this box
+        arrows.push({ id, role, label, colorSet: cs, src: `BOX:${producerBox.id}:bottom`, tgt: `BOX:${box.id}:${role === 'i' ? 'top' : 'left'}` });
+      } else {
+        // external EDGE source — position will be fixed after layout
+        arrows.push({ id, role, label, colorSet: cs, src: `EDGE:0:0`, tgt: tgtRef, _needsEdgePlace: true });
+      }
+    };
+
+    inputIds.forEach(pid   => addArrow(pid, 'i', `BOX:${box.id}:top`));
+    controlIds.forEach(pid => addArrow(pid, 'c', `BOX:${box.id}:left`));
+
+    outputIds.forEach(pid => {
+      const place = S.places.find(p => p.id === pid);
+      if (!place) return;
+      // Does another transition consume this place? → inter-box handled from that side
+      const consumerArc = S.arcs.find(a => a.src === pid && S.transitions.find(t2 => t2.id === a.tgt && t2.id !== t.id));
+      if (!consumerArc) {
+        // Terminal output — EDGE target
+        ac++;
+        arrows.push({ id:`A${ac}`, role:'o', label: place.label||place.id, colorSet: place.colorSet||'TOKEN', src:`BOX:${box.id}:bottom`, tgt:`EDGE:0:0`, _needsEdgePlace: true });
+      }
+      // If consumed by another box, that box's input arrow handles it
+    });
+  });
+
+  // Apply to IDEF0 state
+  IDEF0.boxes  = boxes;
+  IDEF0.arrows = arrows;
+  IDEF0.nc = nc;
+  IDEF0.ac = ac;
+  boxes.forEach(b => delete b._tid);
+
+  // Auto-layout boxes
+  idef0AutoLayout();
+
+  // Now fix EDGE positions for external arrows based on laid-out box positions
+  const PAD = 60;
+  arrows.forEach(a => {
+    if (!a._needsEdgePlace) return;
+    delete a._needsEdgePlace;
+    const tgtParsed = idef0ParseRef(a.tgt);
+    const srcParsed = idef0ParseRef(a.src);
+    if (tgtParsed?.kind === 'box') {
+      const pt = idef0BoxPort(tgtParsed.boxId, tgtParsed.side);
+      if (tgtParsed.side === 'top')  a.src = `EDGE:${Math.round(pt.x)}:${Math.round(pt.y - PAD)}`;
+      if (tgtParsed.side === 'left') a.src = `EDGE:${Math.round(pt.x - PAD)}:${Math.round(pt.y)}`;
+    }
+    if (srcParsed?.kind === 'box') {
+      const pt = idef0BoxPort(srcParsed.boxId, srcParsed.side);
+      if (srcParsed.side === 'bottom') a.tgt = `EDGE:${Math.round(pt.x)}:${Math.round(pt.y + PAD)}`;
+      if (srcParsed.side === 'right')  a.tgt = `EDGE:${Math.round(pt.x + PAD)}:${Math.round(pt.y)}`;
+    }
+  });
+
+  renderIDEF0();
+  scheduleIDEF0Autosave();
+  log(`System diagram generated: ${boxes.length} box(es), ${arrows.length} arrow(s)`, 'system');
+}
+
+document.getElementById('btn-cpn-to-idef0').addEventListener('click', syncIDEF0FromCPN);
 
 // ═══════════════════════════════════════════════════════════
 // IDEF0 — NAVIGATION (drill down / navigate up)
@@ -3236,30 +3622,28 @@ function updateIDEF0StatusBar() {
 // IDEF0 — EXAMPLE
 // ═══════════════════════════════════════════════════════════
 function loadIDEF0Example() {
+  // IDEF0 decomposition of the Producer-Consumer CPN model.
+  // B1 = Assign transition (Ready + Idle → Busy)
+  // B2 = Complete transition (Busy → Done + Idle)
+  // Staircase layout so B1:bottom → B2:top routes cleanly through the gap.
   IDEF0.boxes = [
-    { id: 'B1', label: 'Receive Order',   desc: 'Validate & register', x:  80, y: 160, w: 180, h: 100, cpnData: null },
-    { id: 'B2', label: 'Process Payment', desc: 'Charge & confirm',    x: 340, y: 160, w: 180, h: 100, cpnData: null },
-    { id: 'B3', label: 'Fulfill Order',   desc: 'Pick, pack & ship',   x: 600, y: 160, w: 180, h: 100, cpnData: null },
+    { id: 'B1', label: 'Assign Job',   desc: 'Bind job to available worker',  x:  80, y:  80, w: 200, h: 100, cpnData: null },
+    { id: 'B2', label: 'Complete Job', desc: 'Execute assignment and release', x: 380, y: 280, w: 200, h: 100, cpnData: null },
   ];
   IDEF0.arrows = [
-    // Input (I) — enters from top (blue)
-    { id: 'A1',  src: 'EDGE:170:40',     tgt: 'BOX:B1:top',    role: 'i', label: 'Customer Order',  colorSet: 'ORDER'  },
-    { id: 'A2',  src: 'EDGE:430:40',     tgt: 'BOX:B2:top',    role: 'i', label: 'Validated Order', colorSet: 'ORDER'  },
-    { id: 'A3',  src: 'EDGE:690:40',     tgt: 'BOX:B3:top',    role: 'i', label: 'Paid Order',      colorSet: 'ORDER'  },
-    // Control (C) — enters from left (amber)
-    { id: 'A4',  src: 'EDGE:30:210',     tgt: 'BOX:B1:left',   role: 'c', label: 'Business Rules',  colorSet: 'RULE'   },
-    { id: 'A5',  src: 'EDGE:290:210',    tgt: 'BOX:B2:left',   role: 'c', label: 'Payment Policy',  colorSet: 'RULE'   },
-    { id: 'A6',  src: 'EDGE:550:210',    tgt: 'BOX:B3:left',   role: 'c', label: 'Shipping Policy', colorSet: 'RULE'   },
-    // Output (O) — exits from bottom (green)
-    { id: 'A7',  src: 'BOX:B1:bottom',   tgt: 'EDGE:170:380',  role: 'o', label: 'Order Record',    colorSet: 'ORDER'  },
-    { id: 'A8',  src: 'BOX:B2:bottom',   tgt: 'EDGE:430:380',  role: 'o', label: 'Payment Conf.',   colorSet: 'CONF'   },
-    { id: 'A9',  src: 'BOX:B3:bottom',   tgt: 'EDGE:690:380',  role: 'o', label: 'Shipped Order',   colorSet: 'ORDER'  },
-    // Mechanism (M) — exits from right (purple)
-    { id: 'A10', src: 'BOX:B1:right',    tgt: 'BOX:B2:left',   role: 'm', label: 'Staff',           colorSet: 'PERSON' },
-    { id: 'A11', src: 'BOX:B2:right',    tgt: 'BOX:B3:left',   role: 'm', label: 'Payment System',  colorSet: 'SYSTEM' },
-    { id: 'A12', src: 'BOX:B3:right',    tgt: 'EDGE:830:210',  role: 'm', label: 'Warehouse',       colorSet: 'PLACE'  },
+    // Input (I, blue) — jobs enter Assign from above
+    { id: 'A1', src: 'EDGE:180:20',   tgt: 'BOX:B1:top',   role: 'i', label: 'Ready Jobs',       colorSet: 'JOBS'        },
+    // Control (C, amber) — worker availability constrains Assign
+    { id: 'A2', src: 'EDGE:20:130',   tgt: 'BOX:B1:left',  role: 'c', label: 'Workers Available', colorSet: 'WORKERS'     },
+    // Inter-box: Assign produces Busy token; Complete consumes it as Input
+    // Routes: B1:bottom (180,180) → down to y=230 → across → up to B2:top (480,280)
+    { id: 'A3', src: 'BOX:B1:bottom', tgt: 'BOX:B2:top',   role: 'i', label: 'Busy Assignment',  colorSet: 'JOBS×WORKERS' },
+    // Output (O, green) — completed jobs exit below Complete
+    { id: 'A4', src: 'BOX:B2:bottom', tgt: 'EDGE:480:420', role: 'o', label: 'Completed Jobs',   colorSet: 'JOBS'        },
+    // Mechanism (M, purple) — workers released back to idle pool
+    { id: 'A5', src: 'BOX:B2:right',  tgt: 'EDGE:640:330', role: 'm', label: 'Workers Released',  colorSet: 'WORKERS'     },
   ];
-  IDEF0.nc = 3; IDEF0.ac = 12;
+  IDEF0.nc = 2; IDEF0.ac = 5;
   renderIDEF0();
   log('IDEF0 example loaded', 'system');
 }
@@ -3316,11 +3700,54 @@ document.getElementById('btn-png').addEventListener('click',()=>{
 });
 document.getElementById('btn-pnml').addEventListener('click',()=>dl(serializePNML(),'net.pnml','application/xml'));
 document.getElementById('btn-cpn').addEventListener('click',()=>dl(serializeCPN(),'net.cpn','text/plain'));
+document.getElementById('btn-sys-svg').addEventListener('click',()=>{
+  const svg = document.getElementById('idef0-svg');
+  const world = document.getElementById('idef0-world');
+  const W = world.offsetWidth, H = world.offsetHeight;
+  let s = new XMLSerializer().serializeToString(svg);
+  s = s.replace('<svg', `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" style="background:#07101e"`);
+  const name = (_idef0Name || 'diagram').replace(/\s+/g,'_');
+  dl(s, `${name}.svg`, 'image/svg+xml');
+});
+document.getElementById('btn-sys-png').addEventListener('click',()=>{
+  const svg = document.getElementById('idef0-svg');
+  const world = document.getElementById('idef0-world');
+  const W = world.offsetWidth, H = world.offsetHeight;
+  let s = new XMLSerializer().serializeToString(svg);
+  s = s.replace('<svg', `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" style="background:#07101e"`);
+  const blob = new Blob([s], {type:'image/svg+xml;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const img = new Image();
+  img.onload = () => {
+    const c = document.createElement('canvas'); c.width = W*2; c.height = H*2;
+    const ctx = c.getContext('2d'); ctx.scale(2,2);
+    ctx.fillStyle = '#07101e'; ctx.fillRect(0,0,W,H);
+    ctx.drawImage(img,0,0,W,H); URL.revokeObjectURL(url);
+    const name = (_idef0Name || 'diagram').replace(/\s+/g,'_');
+    c.toBlob(b => { dl(URL.createObjectURL(b), `${name}.png`, 'image/png'); }, 'image/png');
+  };
+  img.src = url;
+});
+document.getElementById('btn-sys').addEventListener('click',()=>{
+  const name = (_idef0Name || 'diagram').replace(/\s+/g,'_');
+  dl(serializeIDEF0(), `${name}.sys`, 'application/json');
+});
 document.getElementById('btn-import').addEventListener('click',()=>document.getElementById('file-inp').click());
 document.getElementById('file-inp').addEventListener('change',ev=>{
   const f=ev.target.files[0];if(!f)return;
   const r=new FileReader();
-  r.onload=e=>{loadFromText(e.target.result);};
+  r.onload=e=>{
+    if(f.name.endsWith('.sys')){
+      deserializeIDEF0(e.target.result);
+      renderIDEF0();
+      currentIDEF0Id=null;
+      setIDEF0Name('');
+      log(`Imported system diagram from ${esc(f.name)}`,'system');
+      switchMode('idef0');
+    } else {
+      loadFromText(e.target.result);
+    }
+  };
   r.readAsText(f);ev.target.value='';
 });
 
@@ -3334,7 +3761,9 @@ function loadFromText(src) {
   document.getElementById('analysis-results').style.display='none';
   ed.value=src;updateHL();applyText();
   if(S.mode==='text')return;
-  autoLayout();render();fitToScreen();
+  autoLayout();
+  if(S.mode==='visual'){render();fitToScreen();}
+  else{S._needsFit=true;}
   log('Net loaded','system');
 }
 
@@ -3457,57 +3886,71 @@ function scheduleIDEF0Autosave() {
 
 setInterval(idef0CloudSave, 60000);
 
-async function refreshIDEF0List() {
-  const res = await fetch('/api/idef0');
-  if (!res.ok) return;
-  const diagrams = await res.json();
-  const sel = document.getElementById('idef0-select');
-  sel.replaceChildren();
-  const placeholder = document.createElement('option');
-  placeholder.value = ''; placeholder.textContent = '— diagrams —';
-  sel.appendChild(placeholder);
-  diagrams.forEach(d => {
-    const opt = document.createElement('option');
-    opt.value = d.id; opt.textContent = d.name;
-    if (d.id === currentIDEF0Id) opt.selected = true;
-    sel.appendChild(opt);
-  });
+let _idef0Name = '';
+let _modelName = '';
+
+function setIDEF0Name(name) {
+  _idef0Name = name || '';
+  if (S.mode === 'idef0') document.getElementById('current-name').textContent = _idef0Name || '— unsaved —';
 }
 
-document.getElementById('idef0-select').addEventListener('change', async ev => {
-  const id = parseInt(ev.target.value);
-  if (!id) return;
-  const res = await fetch(`/api/idef0/${id}`);
-  if (!res.ok) return;
-  const diagram = await res.json();
-  currentIDEF0Id = diagram.id;
-  deserializeIDEF0(diagram.content);
-  renderIDEF0();
-  log(`IDEF0 diagram "${esc(diagram.name)}" loaded`, 'system');
-});
+function setModelName(name) {
+  _modelName = name || '';
+  if (S.mode !== 'idef0') document.getElementById('current-name').textContent = _modelName || '— unsaved —';
+}
 
-document.getElementById('btn-save-idef0').addEventListener('click', async () => {
-  if (!currentIDEF0Id) { document.getElementById('btn-save-as-idef0').click(); return; }
-  await idef0CloudSave();
-  log('IDEF0 diagram saved', 'system');
-});
+function syncCurrentName() {
+  const name = S.mode === 'idef0' ? _idef0Name : _modelName;
+  document.getElementById('current-name').textContent = name || '— unsaved —';
+}
 
-document.getElementById('btn-save-as-idef0').addEventListener('click', async () => {
-  const name = prompt('Diagram name:');
-  if (!name || !name.trim()) return;
-  const res = await fetch('/api/idef0', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: name.trim(), content: serializeIDEF0() }),
-  });
-  if (res.ok) {
-    const diagram = await res.json();
-    currentIDEF0Id = diagram.id;
-    await refreshIDEF0List();
-    log(`IDEF0 diagram saved as "${esc(name.trim())}"`, 'system');
+document.getElementById('btn-save').addEventListener('click', async () => {
+  if (S.mode === 'idef0') {
+    if (!currentIDEF0Id) { document.getElementById('btn-save-as').click(); return; }
+    await idef0CloudSave();
+    log('System diagram saved', 'system');
   } else {
-    const err = await res.json();
-    log(`Save failed: ${esc(err.error || 'unknown error')}`, 'warn');
+    if (!currentModelId) { document.getElementById('btn-save-as').click(); return; }
+    await cloudSave();
+    log('CPN model saved', 'system');
+  }
+});
+
+document.getElementById('btn-save-as').addEventListener('click', async () => {
+  if (S.mode === 'idef0') {
+    const name = prompt('System diagram name:');
+    if (!name || !name.trim()) return;
+    const res = await fetch('/api/idef0', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name.trim(), content: serializeIDEF0() }),
+    });
+    if (res.ok) {
+      const diagram = await res.json();
+      currentIDEF0Id = diagram.id;
+      setIDEF0Name(name.trim());
+      log(`System diagram saved as "${esc(name.trim())}"`, 'system');
+    } else {
+      const err = await res.json();
+      log(`Save failed: ${esc(err.error || 'unknown error')}`, 'warn');
+    }
+  } else {
+    const name = prompt('CPN model name:');
+    if (!name || !name.trim()) return;
+    const res = await fetch('/api/models', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name.trim(), content: serializeCPN() }),
+    });
+    if (res.ok) {
+      const model = await res.json();
+      currentModelId = model.id;
+      setModelName(name.trim());
+      log(`CPN model saved as "${esc(name.trim())}"`, 'system');
+    } else {
+      const err = await res.json();
+      log(`Save failed: ${esc(err.error || 'unknown error')}`, 'warn');
+    }
   }
 });
 
@@ -3515,60 +3958,6 @@ function scheduleAutosave() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(cloudSave, 15000);
 }
-
-setInterval(cloudSave, 60000);
-
-async function refreshModelList() {
-  const res = await fetch('/api/models');
-  if (!res.ok) return;
-  const models = await res.json();
-  const sel = document.getElementById('model-select');
-  sel.replaceChildren();
-  const placeholder = document.createElement('option');
-  placeholder.value = ''; placeholder.textContent = '— models —';
-  sel.appendChild(placeholder);
-  models.forEach(m => {
-    const opt = document.createElement('option');
-    opt.value = m.id; opt.textContent = m.name;
-    if (m.id === currentModelId) opt.selected = true;
-    sel.appendChild(opt);
-  });
-}
-
-document.getElementById('model-select').addEventListener('change', async ev => {
-  const id = parseInt(ev.target.value);
-  if (!id) return;
-  const res = await fetch(`/api/models/${id}`);
-  if (!res.ok) return;
-  const model = await res.json();
-  currentModelId = model.id;
-  loadFromText(model.content);
-});
-
-document.getElementById('btn-save-model').addEventListener('click', async () => {
-  if (!currentModelId) { document.getElementById('btn-save-as-model').click(); return; }
-  await cloudSave();
-  log('Saved', 'system');
-});
-
-document.getElementById('btn-save-as-model').addEventListener('click', async () => {
-  const name = prompt('Model name:');
-  if (!name || !name.trim()) return;
-  const res = await fetch('/api/models', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: name.trim(), content: serializeCPN() }),
-  });
-  if (res.ok) {
-    const model = await res.json();
-    currentModelId = model.id;
-    await refreshModelList();
-    log(`Saved as "${esc(name.trim())}"`, 'system');
-  } else {
-    const err = await res.json();
-    log(`Save failed: ${esc(err.error || 'unknown error')}`, 'warn');
-  }
-});
 
 document.getElementById('btn-logout').addEventListener('click', async () => {
   await Promise.all([cloudSave(), idef0CloudSave()]);
@@ -3596,25 +3985,25 @@ async function boot() {
   log(`Signed in as ${user.username}`, 'system');
   log('Press ? for keyboard shortcuts', 'system');
 
-  // Load CPN models list + most recent model
-  await refreshModelList();
-  const listRes = await fetch('/api/models');
-  const models = listRes.ok ? await listRes.json() : [];
-  if (models.length) {
-    const fullRes = await fetch(`/api/models/${models[0].id}`);
+  // Pre-populate model list cache so DSL cpn-link resolution works at load time
+  const mlRes = await fetch('/api/models');
+  if (mlRes.ok) _idef0ModelList = await mlRes.json();
+
+  // Load most recent CPN model
+  if (_idef0ModelList.length) {
+    const fullRes = await fetch(`/api/models/${_idef0ModelList[0].id}`);
     if (fullRes.ok) {
       const model = await fullRes.json();
       currentModelId = model.id;
       loadFromText(model.content);
-      document.getElementById('model-select').value = model.id;
+      setModelName(model.name);
     }
   } else {
     loadFromText(EXAMPLES.producer);
   }
   applyTransform();
 
-  // Load IDEF0 diagrams list + most recent diagram (if any)
-  await refreshIDEF0List();
+  // Load most recent system (IDEF0) diagram
   const idef0Res = await fetch('/api/idef0');
   const diagrams = idef0Res.ok ? await idef0Res.json() : [];
   if (diagrams.length) {
@@ -3622,11 +4011,13 @@ async function boot() {
     if (fullRes.ok) {
       const diagram = await fullRes.json();
       currentIDEF0Id = diagram.id;
-      deserializeIDEF0(diagram.content);
-      document.getElementById('idef0-select').value = diagram.id;
-      log(`IDEF0 diagram "${esc(diagram.name)}" loaded`, 'system');
+      deserializeIDEF0(diagram.content); // resolveIDEF0CpnLinks runs inside
+      setIDEF0Name(diagram.name);
+      log(`System diagram "${esc(diagram.name)}" loaded`, 'system');
     }
   }
+
+  switchMode('idef0');
 }
 
 boot();

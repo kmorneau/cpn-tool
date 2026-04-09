@@ -432,7 +432,18 @@ dl.field-list dd {
     <li><a href="#comments">Comments</a></li>
     <li><a href="#errors">Errors</a></li>
     <li><a href="#examples">Complete Examples</a></li>
+    <li><a href="#example-tuple">Tuple Marking Example</a></li>
     <li><a href="#quick-ref">Quick Reference</a></li>
+  </ul>
+  <div class="nav-section">System DSL</div>
+  <ul>
+    <li><a href="#sys-intro">Introduction</a></li>
+    <li><a href="#sys-box">box</a></li>
+    <li><a href="#sys-arrow">arrow</a></li>
+    <li><a href="#sys-refs">Endpoint Refs</a></li>
+    <li><a href="#sys-cpn">CPN Linking</a></li>
+    <li><a href="#sys-grammar">Grammar</a></li>
+    <li><a href="#sys-examples">Examples</a></li>
   </ul>
 </nav>
 
@@ -445,7 +456,7 @@ dl.field-list dd {
 
 <div class="version-badge">
   <span class="dot"></span>
-  <span>CPN Tool · Professional Edition · DSL v1.0</span>
+  <span>CPN Tool · Professional Edition · DSL v2.0</span>
 </div>
 
 <!-- ── INTRODUCTION ───────────────────────────────────────── -->
@@ -517,7 +528,9 @@ dl.field-list dd {
 <span class="rule">COLORSET-TYPE</span>   ::= <span class="metavar">NAME</span> (<span class="literal">'*'</span> | <span class="literal">'×'</span>) <span class="metavar">NAME</span>   <span class="comment">// product type</span>
               | <span class="metavar">NAME</span>                          <span class="comment">// simple type</span>
 <span class="rule">value-list</span>      ::= <span class="opt">(empty)</span>
-              | <span class="metavar">NAME</span> (<span class="literal">','</span> <span class="metavar">NAME</span>)*
+              | <span class="metavar">token</span> (<span class="literal">','</span> <span class="metavar">token</span>)*
+<span class="rule">token</span>           ::= <span class="metavar">NAME</span>                          <span class="comment">// simple value: job1, s, w1</span>
+              | <span class="literal">'('</span> <span class="metavar">NAME</span> <span class="literal">','</span> <span class="metavar">NAME</span> <span class="literal">')'</span>   <span class="comment">// tuple value for product places: (s1,r1)</span>
 <span class="rule">arc-expr</span>        ::= <span class="metavar">NAME</span>                          <span class="comment">// variable or literal</span>
               | <span class="literal">'('</span> <span class="metavar">NAME</span> <span class="literal">','</span> <span class="metavar">NAME</span> <span class="literal">')'</span>   <span class="comment">// pair tuple</span>
 <span class="rule">guard-text</span>      ::= <span class="metavar">any-text-until-']'</span>  <span class="comment">// stored as-is, displayed on canvas</span>
@@ -582,7 +595,12 @@ dl.field-list dd {
   </dd>
 
   <dt><code>= { token1, token2, ... }</code> <span class="pill required">required</span></dt>
-  <dd>The initial marking — the tokens present at the start of simulation. Token values must match the declared color set. Use <code>{}</code> for an initially empty place. Repeated tokens are allowed and create a multiset (e.g., <code>{a, a, b}</code> = two <code>a</code> tokens plus one <code>b</code>).</dd>
+  <dd>The initial marking — the tokens present at the start of simulation. Use <code>{}</code> for an initially empty place. Two token forms are supported:
+    <ul style="margin: 8px 0 0 16px; color: var(--text2);">
+      <li style="margin-bottom: 4px"><strong>Simple:</strong> a plain value name — <code>{job1, job2, job3}</code></li>
+      <li style="margin-bottom: 4px"><strong>Tuple:</strong> a parenthesised pair for product-type places — <code>{(s1,get_index), (s2,get_api)}</code></li>
+    </ul>
+    Repeated tokens are allowed and create a multiset (e.g., <code>{a, a, b}</code> = two <code>a</code> tokens plus one <code>b</code>). The parser uses a depth-aware splitter so commas inside parentheses never split a tuple token.</dd>
 </dl>
 
 <h3>Examples</h3>
@@ -602,7 +620,13 @@ dl.field-list dd {
 <span class="kw">place</span> <span class="nm">Semaphore</span> <span class="pt">:</span> <span class="cs">SEM</span>         <span class="pt">=</span> <span class="pt">{</span><span class="tk">s</span><span class="pt">}</span>
 
 <span class="cm">// Multiset initial marking: two identical tokens</span>
-<span class="kw">place</span> <span class="nm">Buffer</span>   <span class="pt">:</span> <span class="cs">DATA</span>         <span class="pt">=</span> <span class="pt">{</span><span class="tk">a</span><span class="pt">,</span> <span class="tk">a</span><span class="pt">,</span> <span class="tk">b</span><span class="pt">}</span></code></pre>
+<span class="kw">place</span> <span class="nm">Buffer</span>   <span class="pt">:</span> <span class="cs">DATA</span>              <span class="pt">=</span> <span class="pt">{</span><span class="tk">a</span><span class="pt">,</span> <span class="tk">a</span><span class="pt">,</span> <span class="tk">b</span><span class="pt">}</span>
+
+<span class="cm">// Product place with tuple initial tokens — commas inside () are not separators</span>
+<span class="kw">place</span> <span class="nm">Pending</span>  <span class="pt">:</span> <span class="cs">SESSION*REQUEST</span>   <span class="pt">=</span> <span class="pt">{</span><span class="tk">(s1,get_index)</span><span class="pt">,</span> <span class="tk">(s2,get_api)</span><span class="pt">}</span>
+
+<span class="cm">// Product place initially empty (tokens arrive via arcs)</span>
+<span class="kw">place</span> <span class="nm">InFlight</span> <span class="pt">:</span> <span class="cs">SESSION*RESPONSE</span>  <span class="pt">=</span> <span class="pt">{}</span></code></pre>
 
 <div class="callout warn">
   <div class="callout-title">Simulation constraint</div>
@@ -1023,6 +1047,60 @@ dl.field-list dd {
   </div>
 </div>
 
+<h3 id="example-tuple">Tuple Initial Marking</h3>
+<p>When a product-type place needs tokens at the start of simulation, write tuple tokens directly in the initial marking. The parser uses a depth-aware splitter so commas inside parentheses are not treated as list separators.</p>
+
+<pre><code><span class="cm">// A client-server request dispatcher</span>
+<span class="cm">// PendingRequest starts pre-loaded with one (session, request) tuple per client</span>
+
+<span class="kw">colorset</span> <span class="nm">SESSION</span>  <span class="pt">=</span> <span class="pt">{</span><span class="tk">s1</span><span class="pt">,</span> <span class="tk">s2</span><span class="pt">,</span> <span class="tk">s3</span><span class="pt">}</span>
+<span class="kw">colorset</span> <span class="nm">REQUEST</span>  <span class="pt">=</span> <span class="pt">{</span><span class="tk">get_index</span><span class="pt">,</span> <span class="tk">get_api</span><span class="pt">,</span> <span class="tk">post_data</span><span class="pt">}</span>
+<span class="kw">colorset</span> <span class="nm">RESPONSE</span> <span class="pt">=</span> <span class="pt">{</span><span class="tk">r200</span><span class="pt">,</span> <span class="tk">r404</span><span class="pt">,</span> <span class="tk">r500</span><span class="pt">}</span>
+
+<span class="cm">// Simple places</span>
+<span class="kw">place</span> <span class="nm">ClientReady</span>  <span class="pt">:</span> <span class="cs">SESSION</span>           <span class="pt">=</span> <span class="pt">{</span><span class="tk">s1</span><span class="pt">,</span> <span class="tk">s2</span><span class="pt">,</span> <span class="tk">s3</span><span class="pt">}</span>
+<span class="kw">place</span> <span class="nm">ServerReady</span>  <span class="pt">:</span> <span class="cs">SESSION</span>           <span class="pt">=</span> <span class="pt">{</span><span class="tk">s1</span><span class="pt">,</span> <span class="tk">s2</span><span class="pt">,</span> <span class="tk">s3</span><span class="pt">}</span>
+<span class="kw">place</span> <span class="nm">ClientDone</span>   <span class="pt">:</span> <span class="cs">SESSION</span>           <span class="pt">=</span> <span class="pt">{}</span>
+
+<span class="cm">// Product places — channel carries (session, request) or (session, response) pairs</span>
+<span class="kw">place</span> <span class="nm">RequestMsg</span>   <span class="pt">:</span> <span class="cs">SESSION*REQUEST</span>   <span class="pt">=</span> <span class="pt">{}</span>
+<span class="kw">place</span> <span class="nm">ResponseMsg</span>  <span class="pt">:</span> <span class="cs">SESSION*RESPONSE</span>  <span class="pt">=</span> <span class="pt">{}</span>
+<span class="kw">place</span> <span class="nm">Processing</span>   <span class="pt">:</span> <span class="cs">SESSION*REQUEST</span>   <span class="pt">=</span> <span class="pt">{}</span>
+
+<span class="cm">// Pre-loaded tuple initial marking — each client session carries a specific request</span>
+<span class="kw">place</span> <span class="nm">Pending</span>      <span class="pt">:</span> <span class="cs">SESSION*REQUEST</span>   <span class="pt">=</span> <span class="pt">{</span><span class="tk">(s1,get_index)</span><span class="pt">,</span> <span class="tk">(s2,get_api)</span><span class="pt">,</span> <span class="tk">(s3,post_data)</span><span class="pt">}</span>
+
+<span class="kw">transition</span> <span class="nm">Send</span>    <span class="pt">[</span><span class="cm">guard:</span> <span class="gd">s in SESSION, r in REQUEST</span><span class="pt">]</span>
+<span class="kw">transition</span> <span class="nm">Process</span> <span class="pt">[</span><span class="cm">guard:</span> <span class="gd">s in SESSION, r in REQUEST</span><span class="pt">]</span>
+<span class="kw">transition</span> <span class="nm">Respond</span> <span class="pt">[</span><span class="cm">guard:</span> <span class="gd">s in SESSION, r in REQUEST</span><span class="pt">]</span>
+<span class="kw">transition</span> <span class="nm">Receive</span> <span class="pt">[</span><span class="cm">guard:</span> <span class="gd">s in SESSION, r in REQUEST</span><span class="pt">]</span>
+
+<span class="cm">// Consuming the tuple from Pending binds both s and r simultaneously</span>
+<span class="kw">arc</span> <span class="nm">ClientReady</span> <span class="pt">--></span> <span class="nm">Send</span>    <span class="pt">:</span> <span class="ex">s</span>
+<span class="kw">arc</span> <span class="nm">Pending</span>     <span class="pt">--></span> <span class="nm">Send</span>    <span class="pt">:</span> <span class="ex">(s,r)</span>
+<span class="kw">arc</span> <span class="nm">Send</span>        <span class="pt">--></span> <span class="nm">RequestMsg</span> <span class="pt">:</span> <span class="ex">(s,r)</span>
+
+<span class="kw">arc</span> <span class="nm">ServerReady</span> <span class="pt">--></span> <span class="nm">Process</span> <span class="pt">:</span> <span class="ex">s</span>
+<span class="kw">arc</span> <span class="nm">RequestMsg</span>  <span class="pt">--></span> <span class="nm">Process</span> <span class="pt">:</span> <span class="ex">(s,r)</span>
+<span class="kw">arc</span> <span class="nm">Process</span>     <span class="pt">--></span> <span class="nm">Processing</span> <span class="pt">:</span> <span class="ex">(s,r)</span>
+
+<span class="kw">arc</span> <span class="nm">Processing</span>  <span class="pt">--></span> <span class="nm">Respond</span> <span class="pt">:</span> <span class="ex">(s,r)</span>
+<span class="kw">arc</span> <span class="nm">Respond</span>     <span class="pt">--></span> <span class="nm">ServerReady</span> <span class="pt">:</span> <span class="ex">s</span>
+<span class="kw">arc</span> <span class="nm">Respond</span>     <span class="pt">--></span> <span class="nm">ResponseMsg</span> <span class="pt">:</span> <span class="ex">(s,r200)</span>
+
+<span class="kw">arc</span> <span class="nm">ResponseMsg</span> <span class="pt">--></span> <span class="nm">Receive</span> <span class="pt">:</span> <span class="ex">(s,r)</span>
+<span class="kw">arc</span> <span class="nm">Receive</span>     <span class="pt">--></span> <span class="nm">ClientDone</span> <span class="pt">:</span> <span class="ex">s</span></code></pre>
+
+<div class="callout note">
+  <div class="callout-title">Key point — tuple binding on input arcs</div>
+  <p>When <code>arc Pending --> Send : (s,r)</code> fires, the engine destructures a tuple token from <code>Pending</code> and simultaneously binds <code>s</code> to the session and <code>r</code> to the request. The arc <code>arc ClientReady --> Send : s</code> then requires the <em>same</em> <code>s</code> value to be present in <code>ClientReady</code> — the binding is shared across all input arcs of the same transition.</p>
+</div>
+
+<div class="callout tip">
+  <div class="callout-title">Literal in output arc expression</div>
+  <p><code>arc Respond --> ResponseMsg : (s,r200)</code> shows a mixed expression — <code>s</code> resolves to the bound session variable while <code>r200</code> is a literal (it is not a bound variable, so the engine uses it as-is). This lets output arcs produce fixed values alongside dynamic ones.</p>
+</div>
+
 <hr class="section-divider">
 
 <!-- ── QUICK REFERENCE ────────────────────────────────────── -->
@@ -1106,18 +1184,279 @@ dl.field-list dd {
     <tr>
       <td>Product (asterisk)</td>
       <td><code>JOBS*WORKERS</code></td>
-      <td>Pair tuple: <code>(job1,w1)</code></td>
+      <td>Pair tuple: <code>(job1,w1)</code> — may appear in initial marking as <code>{(job1,w1), (job2,w2)}</code></td>
     </tr>
     <tr>
       <td>Product (unicode)</td>
       <td><code>JOBS×WORKERS</code></td>
-      <td>Pair tuple: <code>(job1,w1)</code></td>
+      <td>Pair tuple: <code>(job1,w1)</code> — <code>×</code> (U+00D7) is accepted everywhere <code>*</code> is</td>
     </tr>
   </tbody>
 </table>
 
+<hr class="section-divider">
+
+<!-- ── SYSTEM DSL ──────────────────────────────────────────── -->
+<h2 id="sys-intro">System DSL — <em>.sys</em> files</h2>
+
+<p>The System DSL describes IDEF0-style functional decomposition diagrams. Files use the <code>.sys</code> extension and are plain UTF-8 text. The language has two declaration types: <strong>box</strong> (a function) and <strong>arrow</strong> (a data/control flow). Order within the file is irrelevant.</p>
+
+<div class="callout note">
+  <div class="callout-title">Relationship to CPN models</div>
+  <p>Each box in a system diagram can reference a saved CPN model by name. When you drill into a box, the tool opens that model in the CPN canvas. This lets you move between the high-level functional view (System tab) and the formal simulation model (CPN tab) seamlessly.</p>
+</div>
+
+<!-- ── BOX ────────────────────────────────────────────────── -->
+<h2 id="sys-box">box</h2>
+
+<p>Declares a named function block. Boxes are the primary building blocks of the diagram — each one represents a process, activity, or system function.</p>
+
+<h3>Syntax</h3>
+<div class="syntax-block">
+  <div class="syntax-label">Syntax</div>
+  <pre><code><span class="cm">// With explicit coordinates</span>
+<span class="kw">box</span> <span class="nm">ID</span> <span class="pt">"</span><span class="tk">Label</span><span class="pt">"</span> <span class="pt">@</span> <span class="ex">x,y</span> <span class="ex">WxH</span>
+  <span class="kw">desc</span> <span class="pt">"</span><span class="tk">Description text</span><span class="pt">"</span>
+  <span class="kw">cpn</span>  <span class="pt">"</span><span class="tk">model-name</span><span class="pt">"</span>
+
+<span class="cm">// Without coordinates — auto-placed on load</span>
+<span class="kw">box</span> <span class="nm">ID</span> <span class="pt">"</span><span class="tk">Label</span><span class="pt">"</span>
+  <span class="kw">desc</span> <span class="pt">"</span><span class="tk">Description text</span><span class="pt">"</span></code></pre>
+</div>
+
+<dl class="field-list">
+  <dt><code>ID</code> <span class="pill required">required</span></dt>
+  <dd>A unique identifier for this box, used in arrow endpoint references. Conventionally <code>B1</code>, <code>B2</code>, etc.</dd>
+
+  <dt><code>"Label"</code> <span class="pill required">required</span></dt>
+  <dd>The human-readable name displayed inside the box. Quoted string; use <code>\"</code> to include a literal double-quote.</dd>
+
+  <dt><code>@ x,y WxH</code> <span class="pill optional">optional</span></dt>
+  <dd>Canvas position and size in pixels. If omitted, the tool auto-places the box in a grid layout when the diagram loads. Once placed, the coordinates are written back on save.</dd>
+
+  <dt><code>desc "..."</code> <span class="pill optional">optional</span></dt>
+  <dd>A short description shown inside the box below the label.</dd>
+
+  <dt><code>cpn "name"</code> <span class="pill optional">optional</span></dt>
+  <dd>Links this box to a saved CPN model by name. On load the name is resolved to the model ID. When the user drills into the box, that CPN model is opened in the simulation canvas.</dd>
+</dl>
+
+<h3>Examples</h3>
+<pre><code><span class="cm">// Minimal — auto-placed, no CPN link</span>
+<span class="kw">box</span> <span class="nm">B1</span> <span class="pt">"</span><span class="tk">Assign Job</span><span class="pt">"</span>
+
+<span class="cm">// With description and explicit position</span>
+<span class="kw">box</span> <span class="nm">B1</span> <span class="pt">"</span><span class="tk">Assign Job</span><span class="pt">"</span> <span class="pt">@</span> <span class="ex">80,80</span> <span class="ex">200x100</span>
+  <span class="kw">desc</span> <span class="pt">"</span><span class="tk">Bind an available worker to a queued job</span><span class="pt">"</span>
+
+<span class="cm">// With linked CPN model</span>
+<span class="kw">box</span> <span class="nm">B1</span> <span class="pt">"</span><span class="tk">Assign Job</span><span class="pt">"</span> <span class="pt">@</span> <span class="ex">80,80</span> <span class="ex">200x100</span>
+  <span class="kw">desc</span> <span class="pt">"</span><span class="tk">Bind an available worker to a queued job</span><span class="pt">"</span>
+  <span class="kw">cpn</span>  <span class="pt">"</span><span class="tk">producer-consumer</span><span class="pt">"</span></code></pre>
+
+<hr class="section-divider">
+
+<!-- ── ARROW ──────────────────────────────────────────────── -->
+<h2 id="sys-arrow">arrow</h2>
+
+<p>Declares a directed flow between two endpoints. Arrows carry a role (ICOM), a label, and a color set type. Multiple arrows can share the same box side — they are distributed evenly along the edge.</p>
+
+<h3>Syntax</h3>
+<div class="syntax-block">
+  <div class="syntax-label">Syntax</div>
+  <pre><code><span class="kw">arrow</span> <span class="nm">ID</span> <span class="cs">input</span><span class="pt">|</span><span class="cs">control</span><span class="pt">|</span><span class="cs">output</span><span class="pt">|</span><span class="cs">mechanism</span> <span class="pt">"</span><span class="tk">Label</span><span class="pt">"</span> <span class="nm">COLORSET</span> <span class="pt">:</span> <span class="ex">SRC</span> <span class="pt">-></span> <span class="ex">TGT</span>
+  <span class="kw">bend</span> <span class="ex">x,y</span></code></pre>
+</div>
+
+<dl class="field-list">
+  <dt><code>ID</code> <span class="pill required">required</span></dt>
+  <dd>Unique identifier. Conventionally <code>A1</code>, <code>A2</code>, etc.</dd>
+
+  <dt><code>input | control | output | mechanism</code> <span class="pill required">required</span></dt>
+  <dd>The ICOM role. Determines which side of the box the arrow connects to and its colour:
+    <ul style="margin: 8px 0 0 16px; color: var(--text2);">
+      <li style="margin-bottom:4px"><strong>input</strong> — enters the top edge (blue)</li>
+      <li style="margin-bottom:4px"><strong>control</strong> — enters the left edge (amber)</li>
+      <li style="margin-bottom:4px"><strong>output</strong> — exits the bottom edge (green)</li>
+      <li style="margin-bottom:4px"><strong>mechanism</strong> — exits the right edge (purple)</li>
+    </ul>
+  </dd>
+
+  <dt><code>"Label"</code> <span class="pill required">required</span></dt>
+  <dd>The name of the data or signal flowing along this arrow. Shown as a text label near the midpoint.</dd>
+
+  <dt><code>COLORSET</code> <span class="pill required">required</span></dt>
+  <dd>The token type name (matching a <code>colorset</code> declaration in the linked CPN). Use <code>TOKEN</code> as a generic placeholder.</dd>
+
+  <dt><code>: SRC -> TGT</code> <span class="pill required">required</span></dt>
+  <dd>Source and target endpoint references. See <a href="#sys-refs">Endpoint Refs</a> below.</dd>
+
+  <dt><code>bend x,y</code> <span class="pill optional">optional</span></dt>
+  <dd>A user-placed midpoint that overrides automatic orthogonal routing. Coordinates are in canvas pixels.</dd>
+</dl>
+
+<h3>Examples</h3>
+<pre><code><span class="cm">// External input into box B1 from above</span>
+<span class="kw">arrow</span> <span class="nm">A1</span> <span class="cs">input</span> <span class="pt">"</span><span class="tk">Ready Jobs</span><span class="pt">"</span> <span class="nm">JOBS</span> <span class="pt">:</span> <span class="ex">EDGE:180:20</span> <span class="pt">-></span> <span class="ex">BOX:B1:top</span>
+
+<span class="cm">// Control entering from the left edge</span>
+<span class="kw">arrow</span> <span class="nm">A2</span> <span class="cs">control</span> <span class="pt">"</span><span class="tk">Workers Available</span><span class="pt">"</span> <span class="nm">WORKERS</span> <span class="pt">:</span> <span class="ex">EDGE:20:130</span> <span class="pt">-></span> <span class="ex">BOX:B1:left</span>
+
+<span class="cm">// Inter-box: B1 output feeds B2 input</span>
+<span class="kw">arrow</span> <span class="nm">A3</span> <span class="cs">input</span> <span class="pt">"</span><span class="tk">Busy Assignment</span><span class="pt">"</span> <span class="nm">JOBS*WORKERS</span> <span class="pt">:</span> <span class="ex">BOX:B1:bottom</span> <span class="pt">-></span> <span class="ex">BOX:B2:top</span>
+
+<span class="cm">// Inter-box with user bend point to avoid overlapping boxes</span>
+<span class="kw">arrow</span> <span class="nm">A3</span> <span class="cs">input</span> <span class="pt">"</span><span class="tk">Busy Assignment</span><span class="pt">"</span> <span class="nm">JOBS*WORKERS</span> <span class="pt">:</span> <span class="ex">BOX:B1:bottom</span> <span class="pt">-></span> <span class="ex">BOX:B2:top</span>
+  <span class="kw">bend</span> <span class="ex">230,230</span>
+
+<span class="cm">// Terminal output leaving below B2</span>
+<span class="kw">arrow</span> <span class="nm">A4</span> <span class="cs">output</span> <span class="pt">"</span><span class="tk">Completed Jobs</span><span class="pt">"</span> <span class="nm">JOBS</span> <span class="pt">:</span> <span class="ex">BOX:B2:bottom</span> <span class="pt">-></span> <span class="ex">EDGE:480:420</span>
+
+<span class="cm">// Multiple outputs on the same box side — spaced automatically</span>
+<span class="kw">arrow</span> <span class="nm">A5</span> <span class="cs">output</span> <span class="pt">"</span><span class="tk">Audit Log</span><span class="pt">"</span> <span class="nm">LOG</span> <span class="pt">:</span> <span class="ex">BOX:B2:bottom</span> <span class="pt">-></span> <span class="ex">EDGE:560:420</span></code></pre>
+
+<hr class="section-divider">
+
+<!-- ── ENDPOINT REFS ───────────────────────────────────────── -->
+<h2 id="sys-refs">Endpoint References</h2>
+
+<p>Arrow endpoints use one of two reference forms:</p>
+
+<table class="ref-table">
+  <thead><tr><th>Form</th><th>Example</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>BOX:id:side</code></td>
+      <td><code>BOX:B1:top</code></td>
+      <td>A port on a specific side of box <code>id</code>. Side is one of <code>top</code>, <code>bottom</code>, <code>left</code>, <code>right</code>. Position along the side is computed automatically when multiple arrows share the same side.</td>
+    </tr>
+    <tr>
+      <td><code>EDGE:x:y</code></td>
+      <td><code>EDGE:180:20</code></td>
+      <td>A free-floating point on the canvas at pixel coordinates <code>x,y</code>. Used for external sources and sinks — flows that enter or leave the diagram boundary. Moves with the connected box when dragged.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout tip">
+  <div class="callout-title">Omitting coordinates</div>
+  <p>When writing DSL by hand, you can use approximate <code>EDGE</code> coordinates or leave them at <code>EDGE:0:0</code> — they will be repositioned automatically relative to the box port when the diagram loads if they fall at the origin.</p>
+</div>
+
+<hr class="section-divider">
+
+<!-- ── CPN LINKING ────────────────────────────────────────── -->
+<h2 id="sys-cpn">CPN Linking</h2>
+
+<p>A box can be associated with a CPN model in two ways:</p>
+
+<table class="ref-table">
+  <thead><tr><th>Sub-property</th><th>When to use</th><th>Example</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>cpn "name"</code></td>
+      <td>Link to a <strong>saved model</strong> by name. Portable and human-readable. Resolved to the model ID on load.</td>
+      <td><code>cpn "producer-consumer"</code></td>
+    </tr>
+    <tr>
+      <td><code>cpndata &lt;base64&gt;</code></td>
+      <td>Inline <strong>embedded snapshot</strong>. Written automatically when you drill into a box and make edits without saving a named model. Self-contained but opaque.</td>
+      <td><code>cpndata eyJfaW5pd...</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout note">
+  <div class="callout-title">Hand-authoring</div>
+  <p>When writing DSL by hand, only use <code>cpn "name"</code>. The <code>cpndata</code> form is machine-generated and should not be written manually.</p>
+</div>
+
+<hr class="section-divider">
+
+<!-- ── SYSTEM DSL GRAMMAR ─────────────────────────────────── -->
+<h2 id="sys-grammar">Grammar Summary</h2>
+
+<div class="bnf">
+<span class="rule">program</span>      ::= (<span class="metavar">line</span> <span class="literal">'\n'</span>)*
+
+<span class="rule">line</span>         ::= <span class="metavar">comment</span> | <span class="metavar">blank</span> | <span class="metavar">box-decl</span> | <span class="metavar">arrow-decl</span>
+<span class="rule">comment</span>      ::= (<span class="literal">'//'</span> | <span class="literal">'#'</span>) <span class="metavar">any-text</span>
+
+<span class="rule">box-decl</span>     ::= <span class="literal">'box'</span> <span class="metavar">ID</span> <span class="literal">'"'</span><span class="metavar">label</span><span class="literal">'"'</span> [<span class="literal">'@'</span> <span class="metavar">x</span><span class="literal">','</span><span class="metavar">y</span> <span class="metavar">w</span><span class="literal">'x'</span><span class="metavar">h</span>]
+               (<span class="metavar">sub-prop</span>)*
+
+<span class="rule">arrow-decl</span>   ::= <span class="literal">'arrow'</span> <span class="metavar">ID</span> <span class="metavar">role</span> <span class="literal">'"'</span><span class="metavar">label</span><span class="literal">'"'</span> <span class="metavar">COLORSET</span> <span class="literal">':'</span> <span class="metavar">ref</span> <span class="literal">'->'</span> <span class="metavar">ref</span>
+               (<span class="metavar">sub-prop</span>)*
+
+<span class="rule">role</span>         ::= <span class="literal">'input'</span> | <span class="literal">'control'</span> | <span class="literal">'output'</span> | <span class="literal">'mechanism'</span>
+
+<span class="rule">sub-prop</span>     ::= <span class="literal">'  desc'</span> <span class="literal">'"'</span><span class="metavar">text</span><span class="literal">'"'</span>           <span class="comment">// box description</span>
+               | <span class="literal">'  cpn'</span> <span class="literal">'"'</span><span class="metavar">model-name</span><span class="literal">'"'</span>     <span class="comment">// linked CPN model</span>
+               | <span class="literal">'  cpndata'</span> <span class="metavar">base64</span>           <span class="comment">// embedded CPN snapshot</span>
+               | <span class="literal">'  bend'</span> <span class="metavar">x</span><span class="literal">','</span><span class="metavar">y</span>               <span class="comment">// arrow midpoint override</span>
+
+<span class="rule">ref</span>          ::= <span class="literal">'BOX:'</span><span class="metavar">ID</span><span class="literal">':'</span><span class="metavar">side</span>            <span class="comment">// port on a box</span>
+               | <span class="literal">'EDGE:'</span><span class="metavar">x</span><span class="literal">':'</span><span class="metavar">y</span>              <span class="comment">// free canvas point</span>
+
+<span class="rule">side</span>         ::= <span class="literal">'top'</span> | <span class="literal">'bottom'</span> | <span class="literal">'left'</span> | <span class="literal">'right'</span>
+</div>
+
+<hr class="section-divider">
+
+<!-- ── SYSTEM DSL EXAMPLES ────────────────────────────────── -->
+<h2 id="sys-examples">System DSL Examples</h2>
+
+<h3>Producer-Consumer decomposition</h3>
+<p>Models the Producer-Consumer CPN as two function boxes with explicit ICOM flows.</p>
+
+<pre><code><span class="cm">// System Diagram — CPN Tool DSL v1.0</span>
+<span class="cm">// Decomposition of the Producer-Consumer CPN model</span>
+
+<span class="kw">box</span> <span class="nm">B1</span> <span class="pt">"</span><span class="tk">Assign Job</span><span class="pt">"</span> <span class="pt">@</span> <span class="ex">80,80</span> <span class="ex">200x100</span>
+  <span class="kw">desc</span> <span class="pt">"</span><span class="tk">Bind an available worker to a queued job</span><span class="pt">"</span>
+  <span class="kw">cpn</span>  <span class="pt">"</span><span class="tk">producer-consumer</span><span class="pt">"</span>
+
+<span class="kw">box</span> <span class="nm">B2</span> <span class="pt">"</span><span class="tk">Complete Job</span><span class="pt">"</span> <span class="pt">@</span> <span class="ex">380,280</span> <span class="ex">200x100</span>
+  <span class="kw">desc</span> <span class="pt">"</span><span class="tk">Execute the assignment and release the worker</span><span class="pt">"</span>
+
+<span class="kw">arrow</span> <span class="nm">A1</span> <span class="cs">input</span>     <span class="pt">"</span><span class="tk">Ready Jobs</span><span class="pt">"</span>        <span class="nm">JOBS</span>         <span class="pt">:</span> <span class="ex">EDGE:180:20</span>  <span class="pt">-></span> <span class="ex">BOX:B1:top</span>
+<span class="kw">arrow</span> <span class="nm">A2</span> <span class="cs">control</span>   <span class="pt">"</span><span class="tk">Workers Available</span><span class="pt">"</span>  <span class="nm">WORKERS</span>      <span class="pt">:</span> <span class="ex">EDGE:20:130</span>  <span class="pt">-></span> <span class="ex">BOX:B1:left</span>
+<span class="kw">arrow</span> <span class="nm">A3</span> <span class="cs">input</span>     <span class="pt">"</span><span class="tk">Busy Assignment</span><span class="pt">"</span>    <span class="nm">JOBS*WORKERS</span> <span class="pt">:</span> <span class="ex">BOX:B1:bottom</span> <span class="pt">-></span> <span class="ex">BOX:B2:top</span>
+<span class="kw">arrow</span> <span class="nm">A4</span> <span class="cs">output</span>    <span class="pt">"</span><span class="tk">Completed Jobs</span><span class="pt">"</span>     <span class="nm">JOBS</span>         <span class="pt">:</span> <span class="ex">BOX:B2:bottom</span> <span class="pt">-></span> <span class="ex">EDGE:480:420</span>
+<span class="kw">arrow</span> <span class="nm">A5</span> <span class="cs">mechanism</span> <span class="pt">"</span><span class="tk">Workers Released</span><span class="pt">"</span>   <span class="nm">WORKERS</span>      <span class="pt">:</span> <span class="ex">BOX:B2:right</span>  <span class="pt">-></span> <span class="ex">EDGE:640:330</span></code></pre>
+
+<h3>Minimal — no coordinates, no CPN links</h3>
+<p>The simplest valid system diagram. Boxes are auto-placed on load.</p>
+
+<pre><code><span class="kw">box</span> <span class="nm">B1</span> <span class="pt">"</span><span class="tk">Receive Request</span><span class="pt">"</span>
+<span class="kw">box</span> <span class="nm">B2</span> <span class="pt">"</span><span class="tk">Process Request</span><span class="pt">"</span>
+<span class="kw">box</span> <span class="nm">B3</span> <span class="pt">"</span><span class="tk">Send Response</span><span class="pt">"</span>
+
+<span class="kw">arrow</span> <span class="nm">A1</span> <span class="cs">input</span>  <span class="pt">"</span><span class="tk">HTTP Request</span><span class="pt">"</span>  <span class="nm">REQUEST</span>  <span class="pt">:</span> <span class="ex">EDGE:0:0</span> <span class="pt">-></span> <span class="ex">BOX:B1:top</span>
+<span class="kw">arrow</span> <span class="nm">A2</span> <span class="cs">input</span>  <span class="pt">"</span><span class="tk">Validated Req</span><span class="pt">"</span> <span class="nm">REQUEST</span>  <span class="pt">:</span> <span class="ex">BOX:B1:bottom</span> <span class="pt">-></span> <span class="ex">BOX:B2:top</span>
+<span class="kw">arrow</span> <span class="nm">A3</span> <span class="cs">input</span>  <span class="pt">"</span><span class="tk">Processed Req</span><span class="pt">"</span> <span class="nm">REQUEST</span>  <span class="pt">:</span> <span class="ex">BOX:B2:bottom</span> <span class="pt">-></span> <span class="ex">BOX:B3:top</span>
+<span class="kw">arrow</span> <span class="nm">A4</span> <span class="cs">output</span> <span class="pt">"</span><span class="tk">HTTP Response</span><span class="pt">"</span> <span class="nm">RESPONSE</span> <span class="pt">:</span> <span class="ex">BOX:B3:bottom</span> <span class="pt">-></span> <span class="ex">EDGE:0:0</span></code></pre>
+
+<h3>Quick reference</h3>
+<table class="ref-table">
+  <thead><tr><th>Keyword</th><th>Syntax</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td><code>box</code></td><td><code>box ID "Label" [@ x,y WxH]</code></td><td>Declare a function block</td></tr>
+    <tr><td><code>desc</code></td><td><code>&nbsp;&nbsp;desc "text"</code></td><td>Box description (sub-property)</td></tr>
+    <tr><td><code>cpn</code></td><td><code>&nbsp;&nbsp;cpn "model-name"</code></td><td>Link to a saved CPN model (sub-property)</td></tr>
+    <tr><td><code>arrow</code></td><td><code>arrow ID role "Label" CS : SRC -> TGT</code></td><td>Declare a directed ICOM flow</td></tr>
+    <tr><td><code>bend</code></td><td><code>&nbsp;&nbsp;bend x,y</code></td><td>Override arrow midpoint (sub-property)</td></tr>
+    <tr><td><code>BOX:id:side</code></td><td><code>BOX:B1:top</code></td><td>Box port endpoint reference</td></tr>
+    <tr><td><code>EDGE:x:y</code></td><td><code>EDGE:180:20</code></td><td>Free canvas point endpoint reference</td></tr>
+    <tr><td><code>input</code></td><td></td><td>Role — enters top (blue)</td></tr>
+    <tr><td><code>control</code></td><td></td><td>Role — enters left (amber)</td></tr>
+    <tr><td><code>output</code></td><td></td><td>Role — exits bottom (green)</td></tr>
+    <tr><td><code>mechanism</code></td><td></td><td>Role — exits right (purple)</td></tr>
+  </tbody>
+</table>
+
 <p style="margin-top: 48px; font-size: 12px; color: var(--text3); border-top: 1px solid var(--border); padding-top: 20px;">
-  CPN Tool — Professional Edition &nbsp;·&nbsp; DSL Reference v1.0 &nbsp;·&nbsp;
+  CPN Tool — Professional Edition &nbsp;·&nbsp; DSL Reference v2.0 &nbsp;·&nbsp;
   <a href="#intro">Back to top</a>
 </p>
 
