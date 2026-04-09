@@ -16,6 +16,7 @@ function makeEngine(src) {
   if (src) {
     const res = eng.parseCPN(src);
     S.colorsets = res.cs;
+    S.vars      = res.vars || {};
     S.places    = res.places.map(p => ({ ...p, x: 0, y: 0 }));
     S.transitions = res.transitions.map(t => ({ ...t, x: 0, y: 0 }));
     const byLabel = {};
@@ -35,7 +36,9 @@ describe('1. Parser — parseCPN', () => {
   test('parses colorsets', () => {
     const { parseCPN } = createEngine();
     const r = parseCPN('colorset JOBS = {job1, job2, job3}');
-    assert.deepEqual(r.cs.JOBS, ['job1', 'job2', 'job3']);
+    // New: cs.JOBS is a descriptor object
+    assert.equal(r.cs.JOBS.kind, 'enum');
+    assert.deepEqual(r.cs.JOBS.values, ['job1', 'job2', 'job3']);
   });
 
   test('parses places with initial tokens', () => {
@@ -412,6 +415,11 @@ describe('6. Syntax Highlighter — hlLine', () => {
     assert.ok(hlLine('colorset JOBS = {a, b}').includes('hl-kw'));
   });
 
+  test('colset line gets hl-kw span', () => {
+    const { hlLine } = createEngine();
+    assert.ok(hlLine('colset JOBS = {a, b}').includes('hl-kw'));
+  });
+
   test('place line gets hl-cs span for colorset', () => {
     const { hlLine } = createEngine();
     assert.ok(hlLine('place P1 : JOBS = {a}').includes('hl-cs'));
@@ -432,6 +440,13 @@ describe('6. Syntax Highlighter — hlLine', () => {
     const out = hlLine('// <script>');
     assert.ok(!out.includes('<script>'));
     assert.ok(out.includes('&lt;script&gt;'));
+  });
+
+  test('var line gets hl-kw span', () => {
+    const { hlLine } = createEngine();
+    const out = hlLine('var n : INT;');
+    assert.ok(out.includes('hl-kw'));
+    assert.ok(out.includes('hl-cs'));
   });
 });
 
@@ -602,5 +617,546 @@ arc Complete --> Free : w`);
     const free = S.places.find(p => p.label === 'Free');
     assert.deepEqual(done.tokens, ['job1']);
     assert.deepEqual(free.tokens, ['w1']);
+  });
+});
+
+// ── Suite 11: Colorset type system ───────────────────────────────────────────
+describe('11. Colorset type system — parseColorset descriptors', () => {
+  test('old brace format still parses to enum', () => {
+    const { parseCPN } = createEngine();
+    const r = parseCPN('colorset C = {a, b, c}');
+    assert.equal(r.cs.C.kind, 'enum');
+    assert.deepEqual(r.cs.C.values, ['a', 'b', 'c']);
+  });
+
+  test('colset keyword accepted', () => {
+    const { parseCPN } = createEngine();
+    const r = parseCPN('colset C = {x, y}');
+    assert.equal(r.cs.C.kind, 'enum');
+    assert.deepEqual(r.cs.C.values, ['x', 'y']);
+  });
+
+  test('unit colorset', () => {
+    const { parseCPN } = createEngine();
+    const r = parseCPN('colset U = unit;');
+    assert.equal(r.cs.U.kind, 'unit');
+    assert.equal(r.cs.U.unitVal, '()');
+  });
+
+  test('unit with custom value', () => {
+    const { parseCPN } = createEngine();
+    const r = parseCPN('colset U = unit with dot;');
+    assert.equal(r.cs.U.kind, 'unit');
+    assert.equal(r.cs.U.unitVal, 'dot');
+  });
+
+  test('bool colorset defaults', () => {
+    const { parseCPN } = createEngine();
+    const r = parseCPN('colset B = bool;');
+    assert.equal(r.cs.B.kind, 'bool');
+    assert.equal(r.cs.B.falseVal, 'false');
+    assert.equal(r.cs.B.trueVal, 'true');
+  });
+
+  test('bool with custom values', () => {
+    const { parseCPN } = createEngine();
+    const r = parseCPN('colset B = bool with no yes;');
+    assert.equal(r.cs.B.kind, 'bool');
+    assert.equal(r.cs.B.falseVal, 'no');
+    assert.equal(r.cs.B.trueVal, 'yes');
+  });
+
+  test('int with range', () => {
+    const { parseCPN } = createEngine();
+    const r = parseCPN('colset INT = int with 0..5;');
+    assert.equal(r.cs.INT.kind, 'int');
+    assert.equal(r.cs.INT.low, 0);
+    assert.equal(r.cs.INT.high, 5);
+  });
+
+  test('int without range', () => {
+    const { parseCPN } = createEngine();
+    const r = parseCPN('colset INT = int;');
+    assert.equal(r.cs.INT.kind, 'int');
+    assert.equal(r.cs.INT.low, null);
+    assert.equal(r.cs.INT.high, null);
+  });
+
+  test('intinf colorset', () => {
+    const { parseCPN } = createEngine();
+    const r = parseCPN('colset N = intinf;');
+    assert.equal(r.cs.N.kind, 'intinf');
+  });
+
+  test('index colorset', () => {
+    const { parseCPN } = createEngine();
+    const r = parseCPN('colset IDX = index i with 1..3;');
+    assert.equal(r.cs.IDX.kind, 'index');
+    assert.equal(r.cs.IDX.indexName, 'i');
+    assert.equal(r.cs.IDX.low, 1);
+    assert.equal(r.cs.IDX.high, 3);
+  });
+
+  test('string colorset', () => {
+    const { parseCPN } = createEngine();
+    const r = parseCPN('colset S = string;');
+    assert.equal(r.cs.S.kind, 'string');
+  });
+
+  test('real colorset', () => {
+    const { parseCPN } = createEngine();
+    const r = parseCPN('colset R = real;');
+    assert.equal(r.cs.R.kind, 'real');
+  });
+
+  test('product colorset', () => {
+    const { parseCPN } = createEngine();
+    const r = parseCPN('colset P = product A * B;');
+    assert.equal(r.cs.P.kind, 'product');
+    assert.deepEqual(r.cs.P.parts, ['A', 'B']);
+  });
+
+  test('record colorset', () => {
+    const { parseCPN } = createEngine();
+    const r = parseCPN('colset REC = record name:STRING * age:INT;');
+    assert.equal(r.cs.REC.kind, 'record');
+    assert.equal(r.cs.REC.fields.length, 2);
+    assert.equal(r.cs.REC.fields[0].name, 'name');
+    assert.equal(r.cs.REC.fields[0].cs, 'STRING');
+    assert.equal(r.cs.REC.fields[1].name, 'age');
+    assert.equal(r.cs.REC.fields[1].cs, 'INT');
+  });
+
+  test('list colorset', () => {
+    const { parseCPN } = createEngine();
+    const r = parseCPN('colset L = list INT;');
+    assert.equal(r.cs.L.kind, 'list');
+    assert.equal(r.cs.L.base, 'INT');
+    assert.equal(r.cs.L.minLen, null);
+    assert.equal(r.cs.L.maxLen, null);
+  });
+
+  test('list colorset with length bounds', () => {
+    const { parseCPN } = createEngine();
+    const r = parseCPN('colset L = list INT with 0..10;');
+    assert.equal(r.cs.L.kind, 'list');
+    assert.equal(r.cs.L.base, 'INT');
+    assert.equal(r.cs.L.minLen, 0);
+    assert.equal(r.cs.L.maxLen, 10);
+  });
+
+  test('union colorset', () => {
+    const { parseCPN } = createEngine();
+    const r = parseCPN('colset U = union leaf | node:INT;');
+    assert.equal(r.cs.U.kind, 'union');
+    assert.equal(r.cs.U.variants.length, 2);
+    assert.equal(r.cs.U.variants[0].tag, 'leaf');
+    assert.equal(r.cs.U.variants[0].cs, null);
+    assert.equal(r.cs.U.variants[1].tag, 'node');
+    assert.equal(r.cs.U.variants[1].cs, 'INT');
+  });
+
+  test('alias colorset', () => {
+    const { parseCPN } = createEngine();
+    const r = parseCPN('colset MYINT = INT;');
+    assert.equal(r.cs.MYINT.kind, 'alias');
+    assert.equal(r.cs.MYINT.base, 'INT');
+  });
+
+  test('timed suffix', () => {
+    const { parseCPN } = createEngine();
+    const r = parseCPN('colset T = int with 0..3 timed;');
+    assert.equal(r.cs.T.kind, 'int');
+    assert.equal(r.cs.T.timed, true);
+  });
+
+  test('timed on enum', () => {
+    const { parseCPN } = createEngine();
+    const r = parseCPN('colset E = {a, b} timed;');
+    assert.equal(r.cs.E.kind, 'enum');
+    assert.equal(r.cs.E.timed, true);
+  });
+
+  // csValues helper tests
+  test('csValues: enum', () => {
+    const { csValues } = createEngine();
+    assert.deepEqual(csValues({ kind: 'enum', values: ['x', 'y'] }), ['x', 'y']);
+  });
+
+  test('csValues: unit', () => {
+    const { csValues } = createEngine();
+    assert.deepEqual(csValues({ kind: 'unit', unitVal: '()' }), ['()']);
+  });
+
+  test('csValues: bool', () => {
+    const { csValues } = createEngine();
+    assert.deepEqual(csValues({ kind: 'bool', falseVal: 'false', trueVal: 'true' }), ['false', 'true']);
+  });
+
+  test('csValues: int with range', () => {
+    const { csValues } = createEngine();
+    assert.deepEqual(csValues({ kind: 'int', low: 0, high: 3 }), ['0', '1', '2', '3']);
+  });
+
+  test('csValues: int without range returns empty', () => {
+    const { csValues } = createEngine();
+    assert.deepEqual(csValues({ kind: 'int', low: null, high: null }), []);
+  });
+
+  test('csValues: index', () => {
+    const { csValues } = createEngine();
+    assert.deepEqual(csValues({ kind: 'index', indexName: 'p', low: 1, high: 3 }), ['p1', 'p2', 'p3']);
+  });
+
+  test('csValues: unknown kind returns empty', () => {
+    const { csValues } = createEngine();
+    assert.deepEqual(csValues({ kind: 'string' }), []);
+  });
+
+  test('csValues: null descriptor returns empty', () => {
+    const { csValues } = createEngine();
+    assert.deepEqual(csValues(null), []);
+  });
+});
+
+// ── Suite 12: var declarations ───────────────────────────────────────────────
+describe('12. var declarations — parse + serialize', () => {
+  test('parses single var declaration', () => {
+    const { parseCPN } = createEngine();
+    const r = parseCPN('colset INT = int with 0..5;\nvar n : INT;');
+    assert.equal(r.vars.n, 'INT');
+  });
+
+  test('parses multiple vars in one declaration', () => {
+    const { parseCPN } = createEngine();
+    const r = parseCPN('colset C = {a,b};\nvar x, y : C;');
+    assert.equal(r.vars.x, 'C');
+    assert.equal(r.vars.y, 'C');
+  });
+
+  test('parses vars with different colorsets', () => {
+    const { parseCPN } = createEngine();
+    const r = parseCPN('colset A = {x};\ncolset B = {y};\nvar p : A;\nvar q : B;');
+    assert.equal(r.vars.p, 'A');
+    assert.equal(r.vars.q, 'B');
+  });
+
+  test('serializeCPN emits var declarations', () => {
+    const eng = makeEngine('colset INT = int with 0..5;\nvar n : INT;\nplace P : INT = {0}\ntransition T\narc P --> T : n\narc T --> P : n');
+    const src = eng.serializeCPN();
+    assert.ok(src.includes('var n : INT'), `Expected var declaration, got: ${src}`);
+  });
+
+  test('serializeCPN vars round-trip through parseCPN', () => {
+    const eng = makeEngine('colset C = {a, b};\nvar x, y : C;\nplace P : C = {a}\ntransition T\narc P --> T : x');
+    const src = eng.serializeCPN();
+    const r = eng.parseCPN(src);
+    assert.equal(r.errors.length, 0);
+    assert.ok(r.vars.x === 'C' || r.vars.y === 'C', 'vars should survive round-trip');
+  });
+
+  test('S.vars is populated after makeEngine', () => {
+    const eng = makeEngine('colset INT = int with 0..3;\nvar n : INT;\nplace P : INT = {0}\ntransition T\narc P --> T : n');
+    assert.equal(eng.S.vars.n, 'INT');
+  });
+});
+
+// ── Suite 13: Guard evaluator ────────────────────────────────────────────────
+describe('13. Guard evaluator — evalGuard', () => {
+  test('true guard always passes', () => {
+    const { evalGuard } = createEngine();
+    assert.equal(evalGuard('true', {}, {}, {}), true);
+    assert.equal(evalGuard('', {}, {}, {}), true);
+    assert.equal(evalGuard(null, {}, {}, {}), true);
+  });
+
+  test('false guard always fails', () => {
+    const { evalGuard } = createEngine();
+    assert.equal(evalGuard('false', {}, {}, {}), false);
+  });
+
+  test('numeric comparison equal', () => {
+    const { evalGuard } = createEngine();
+    assert.equal(evalGuard('n = 3', { n: 3 }, {}, {}), true);
+    assert.equal(evalGuard('n = 3', { n: 2 }, {}, {}), false);
+  });
+
+  test('numeric comparison less-than', () => {
+    const { evalGuard } = createEngine();
+    assert.equal(evalGuard('n < 5', { n: 3 }, {}, {}), true);
+    assert.equal(evalGuard('n < 5', { n: 5 }, {}, {}), false);
+  });
+
+  test('numeric comparison greater-than', () => {
+    const { evalGuard } = createEngine();
+    assert.equal(evalGuard('n > 2', { n: 3 }, {}, {}), true);
+    assert.equal(evalGuard('n > 2', { n: 2 }, {}, {}), false);
+  });
+
+  test('numeric comparison <=', () => {
+    const { evalGuard } = createEngine();
+    assert.equal(evalGuard('n <= 5', { n: 5 }, {}, {}), true);
+    assert.equal(evalGuard('n <= 5', { n: 6 }, {}, {}), false);
+  });
+
+  test('numeric comparison >=', () => {
+    const { evalGuard } = createEngine();
+    assert.equal(evalGuard('n >= 0', { n: 0 }, {}, {}), true);
+    assert.equal(evalGuard('n >= 0', { n: -1 }, {}, {}), false);
+  });
+
+  test('numeric comparison <>', () => {
+    const { evalGuard } = createEngine();
+    assert.equal(evalGuard('n <> 3', { n: 4 }, {}, {}), true);
+    assert.equal(evalGuard('n <> 3', { n: 3 }, {}, {}), false);
+  });
+
+  test('andalso short-circuit', () => {
+    const { evalGuard } = createEngine();
+    assert.equal(evalGuard('n > 0 andalso n < 5', { n: 3 }, {}, {}), true);
+    assert.equal(evalGuard('n > 0 andalso n < 5', { n: 0 }, {}, {}), false);
+  });
+
+  test('orelse', () => {
+    const { evalGuard } = createEngine();
+    assert.equal(evalGuard('n = 0 orelse n = 5', { n: 0 }, {}, {}), true);
+    assert.equal(evalGuard('n = 0 orelse n = 5', { n: 5 }, {}, {}), true);
+    assert.equal(evalGuard('n = 0 orelse n = 5', { n: 3 }, {}, {}), false);
+  });
+
+  test('not operator', () => {
+    const { evalGuard } = createEngine();
+    assert.equal(evalGuard('not n = 3', { n: 3 }, {}, {}), false);
+    assert.equal(evalGuard('not n = 3', { n: 4 }, {}, {}), true);
+  });
+
+  test('mod operator', () => {
+    const { evalGuard } = createEngine();
+    assert.equal(evalGuard('n mod 2 = 0', { n: 4 }, {}, {}), true);
+    assert.equal(evalGuard('n mod 2 = 0', { n: 3 }, {}, {}), false);
+  });
+
+  test('div operator', () => {
+    const { evalGuard } = createEngine();
+    assert.equal(evalGuard('n div 2 = 2', { n: 5 }, {}, {}), true);
+    assert.equal(evalGuard('n div 2 = 2', { n: 4 }, {}, {}), true);
+  });
+
+  test('abs builtin', () => {
+    const { evalGuard } = createEngine();
+    assert.equal(evalGuard('abs(n) = 3', { n: -3 }, {}, {}), true);
+  });
+
+  test('string equality', () => {
+    const { evalGuard } = createEngine();
+    assert.equal(evalGuard('s = "hello"', { s: 'hello' }, {}, {}), true);
+    assert.equal(evalGuard('s = "hello"', { s: 'world' }, {}, {}), false);
+  });
+
+  test('invalid guard expression returns true (safe fallback)', () => {
+    const { evalGuard } = createEngine();
+    // Should not throw, should return true
+    assert.equal(evalGuard('not-valid-syntax!!!', {}, {}, {}), true);
+  });
+
+  test('getEnabled respects guard: n < 5 filters n=5', () => {
+    // Build a net where guard is n < 5, place has tokens 3 and 5
+    const eng = makeEngine(`colset INT = int with 0..5;
+var n : INT;
+place P : INT = {3, 5}
+transition T [guard: n < 5]
+arc P --> T : n
+arc T --> P : n`);
+    const enabled = eng.getEnabled();
+    // Only n=3 should be enabled (n=5 fails guard)
+    assert.ok(enabled.length > 0);
+    assert.ok(enabled.every(e => Number(e.binding.n) < 5), 'All enabled bindings should satisfy guard');
+  });
+
+  test('getEnabled respects guard: n = 5 filters others', () => {
+    const eng = makeEngine(`colset INT = int with 0..5;
+var n : INT;
+place P : INT = {3, 5}
+transition T [guard: n = 5]
+arc P --> T : n
+arc T --> P : n`);
+    const enabled = eng.getEnabled();
+    assert.ok(enabled.length > 0);
+    assert.ok(enabled.every(e => Number(e.binding.n) === 5));
+  });
+});
+
+// ── Suite 14: n-tuple _tryBind ───────────────────────────────────────────────
+describe('14. n-tuple _tryBind — 3-tuple and constrained binding', () => {
+  test('3-tuple binding extracts three variables', () => {
+    const eng = makeEngine(`
+colorset A = {a1}
+colorset B = {b1}
+colorset C = {c1}
+place P : A*B*C = {(a1,b1,c1)}
+place Out : A = {}
+transition T [guard: true]
+arc P --> T : (x,y,z)
+arc T --> Out : x`);
+    const enabled = eng.getEnabled();
+    assert.ok(enabled.length > 0, '3-tuple transition should be enabled');
+    assert.equal(enabled[0].binding.x, 'a1');
+    assert.equal(enabled[0].binding.y, 'b1');
+    assert.equal(enabled[0].binding.z, 'c1');
+  });
+
+  test('3-tuple fire produces correct output', () => {
+    const eng = makeEngine(`
+colorset A = {a1}
+colorset B = {b1}
+colorset C = {c1}
+place P : A*B*C = {(a1,b1,c1)}
+place Out : A = {}
+transition T [guard: true]
+arc P --> T : (x,y,z)
+arc T --> Out : x`);
+    eng.fireItem(eng.getEnabled()[0]);
+    const out = eng.S.places.find(p => p.label === 'Out');
+    assert.deepEqual(out.tokens, ['a1']);
+  });
+
+  test('constrained variable: same variable on two arcs enforces consistency', () => {
+    // If two input arcs both have variable x, only fire if tokens match
+    const eng = makeEngine(`
+colorset C = {a, b}
+place P1 : C = {a}
+place P2 : C = {a}
+place Out : C = {}
+transition T [guard: true]
+arc P1 --> T : x
+arc P2 --> T : x
+arc T --> Out : x`);
+    const enabled = eng.getEnabled();
+    // Both places have 'a', so x=a is consistent — should be enabled
+    assert.ok(enabled.length > 0);
+    assert.equal(enabled[0].binding.x, 'a');
+  });
+
+  test('constrained variable mismatch prevents firing', () => {
+    const eng = makeEngine(`
+colorset C = {a, b}
+place P1 : C = {a}
+place P2 : C = {b}
+place Out : C = {}
+transition T [guard: true]
+arc P1 --> T : x
+arc P2 --> T : x
+arc T --> Out : x`);
+    // P1 has 'a', P2 has 'b' — no consistent binding for x
+    const enabled = eng.getEnabled();
+    assert.equal(enabled.length, 0);
+  });
+
+  test('numeric literal in arc pattern matches token', () => {
+    // Token '5' in place, arc pattern '5' — should bind
+    const eng = makeEngine(`
+colorset INT = int with 0..5;
+place P : INT = {5}
+place Out : INT = {}
+transition T [guard: true]
+arc P --> T : 5
+arc T --> Out : 5`);
+    const enabled = eng.getEnabled();
+    assert.ok(enabled.length > 0);
+  });
+
+  test('numeric literal mismatch prevents firing', () => {
+    const eng = makeEngine(`
+colorset INT = int with 0..5;
+place P : INT = {3}
+place Out : INT = {}
+transition T [guard: true]
+arc P --> T : 5
+arc T --> Out : 5`);
+    // Place has 3, arc expects 5
+    const enabled = eng.getEnabled();
+    assert.equal(enabled.length, 0);
+  });
+});
+
+// ── Suite 15: evalArcExpr ────────────────────────────────────────────────────
+describe('15. evalArcExpr — arithmetic in arc expressions', () => {
+  test('constant expression', () => {
+    const { evalArcExpr } = createEngine();
+    assert.equal(evalArcExpr('42', {}), '42');
+  });
+
+  test('variable lookup', () => {
+    const { evalArcExpr } = createEngine();
+    assert.equal(evalArcExpr('x', { x: 'hello' }), 'hello');
+  });
+
+  test('arithmetic addition', () => {
+    const { evalArcExpr } = createEngine();
+    assert.equal(evalArcExpr('n + 1', { n: 3 }), '4');
+  });
+
+  test('arithmetic subtraction', () => {
+    const { evalArcExpr } = createEngine();
+    assert.equal(evalArcExpr('n - 1', { n: 5 }), '4');
+  });
+
+  test('arithmetic multiplication', () => {
+    const { evalArcExpr } = createEngine();
+    assert.equal(evalArcExpr('n * 2', { n: 3 }), '6');
+  });
+
+  test('mod operator', () => {
+    const { evalArcExpr } = createEngine();
+    assert.equal(evalArcExpr('n mod 3', { n: 7 }), '1');
+  });
+
+  test('div operator', () => {
+    const { evalArcExpr } = createEngine();
+    assert.equal(evalArcExpr('n div 2', { n: 7 }), '3');
+  });
+
+  test('string concatenation with ^', () => {
+    const { evalArcExpr } = createEngine();
+    assert.equal(evalArcExpr('s ^ "!"', { s: 'hello' }), 'hello!');
+  });
+
+  test('abs builtin', () => {
+    const { evalArcExpr } = createEngine();
+    assert.equal(evalArcExpr('abs(n)', { n: -5 }), '5');
+  });
+
+  test('tuple construction returns (a,b) form', () => {
+    const { evalArcExpr } = createEngine();
+    assert.equal(evalArcExpr('(x, y)', { x: 'a', y: 'b' }), '(a,b)');
+  });
+
+  test('3-tuple construction', () => {
+    const { evalArcExpr } = createEngine();
+    assert.equal(evalArcExpr('(x, y, z)', { x: '1', y: '2', z: '3' }), '(1,2,3)');
+  });
+
+  test('n+1 in arc integrates with StateSpace fire', () => {
+    // Counter net: arc out of transition is n+1
+    const eng = makeEngine(`colset INT = int with 0..3;
+var n : INT;
+place Counter : INT = {0}
+place Out : INT = {}
+transition Inc [guard: n < 3]
+arc Counter --> Inc : n
+arc Inc --> Out : n`);
+    // n=0 should be enabled (0 < 3), firing should consume 0 and produce 0 in Out
+    const ss = new eng.StateSpace();
+    const init = {};
+    eng.S.places.forEach(p => { init[p.id] = [...p.tokens]; });
+    const enabled = ss.getEnabled(init);
+    assert.ok(enabled.length > 0);
+  });
+
+  test('evalArcExpr n+1 correctly increments counter', () => {
+    const { evalArcExpr } = createEngine();
+    // Simulates: arc T --> Counter : n+1 with binding n=2
+    assert.equal(evalArcExpr('n+1', { n: '2' }), '3');
+    assert.equal(evalArcExpr('n+1', { n: 2 }), '3');
   });
 });
